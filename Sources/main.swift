@@ -391,11 +391,9 @@ class ClipboardMonitor {
         let entryCount = try dbManager.getEntryCount()
         print("Database initialized with \(entryCount) entries")
         print("Maximum entries set to: \(maxEntries)")
-        
-        startMonitoring()
     }
     
-    private func startMonitoring() {
+    func startMonitoring() {
         // Start polling the pasteboard
         while true {
             autoreleasepool {
@@ -500,34 +498,24 @@ class ClipboardMonitor {
 }
 
 // MARK: - Main
-print("Starting Kopya clipboard manager...")
-
-// Create a shared database manager
-let dbManager = try DatabaseManager(maxEntries: 1000)
-
-// Configure and start Vapor server
-let app = try Application(.detect())
-try setupRoutes(app, dbManager)
-
-// Start the web server in a background thread
-Thread.detachNewThread {
-    do {
-        try app.run()
-    } catch {
-        print("Error starting web server:", error)
-        exit(1)
+@main
+struct Kopya {
+    static func main() async throws {
+        print("Starting Kopya clipboard manager...")
+        
+        let maxEntries = 1000
+        let dbManager = try DatabaseManager(maxEntries: maxEntries)
+        
+        // Configure and start Vapor server
+        let app = try await Application.make(.detect())
+        try setupRoutes(app, dbManager)
+        
+        // Start clipboard monitoring in a background task
+        Task.detached {
+            try await app.execute()
+        }
+        
+        // Start monitoring clipboard in the main thread
+        try ClipboardMonitor(maxEntries: maxEntries).startMonitoring()
     }
 }
-
-// Create a background thread for clipboard monitoring
-Thread.detachNewThread {
-    do {
-        _ = try ClipboardMonitor(maxEntries: 1000)
-    } catch {
-        print("Error initializing ClipboardMonitor:", error)
-        exit(1)
-    }
-}
-
-// Keep main thread running
-RunLoop.main.run()
