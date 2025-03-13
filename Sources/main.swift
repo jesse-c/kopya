@@ -169,6 +169,41 @@ class DatabaseManager: @unchecked Sendable {
         }
     }
     
+    func searchEntries(type: String? = nil, query: String? = nil, limit: Int? = nil) throws -> [ClipboardEntry] {
+        try dbQueue.read { db in
+            var request = ClipboardEntry.order(Column("timestamp").desc)
+            
+            // Apply type filter
+            if let type = type {
+                switch type.lowercased() {
+                case "textual":
+                    let textualTypes = [
+                        NSPasteboard.PasteboardType.string.rawValue,
+                        NSPasteboard.PasteboardType.URL.rawValue,
+                        NSPasteboard.PasteboardType.fileURL.rawValue,
+                        NSPasteboard.PasteboardType.rtf.rawValue
+                    ]
+                    request = request.filter(textualTypes.contains(Column("type")))
+                case "url":
+                    request = request.filter(Column("type") == NSPasteboard.PasteboardType.URL.rawValue)
+                default:
+                    request = request.filter(Column("type") == type)
+                }
+            }
+            
+            // Apply text search if query provided (case-insensitive)
+            if let searchQuery = query {
+                request = request.filter(Column("content").like("%\(searchQuery)%").collating(.nocase))
+            }
+            
+            if let limit = limit {
+                request = request.limit(limit)
+            }
+            
+            return try request.fetchAll(db)
+        }
+    }
+    
     func deleteEntries(limit: Int? = nil) throws -> Int {
         try dbQueue.write { db in
             if let limit = limit {
@@ -200,6 +235,18 @@ func setupRoutes(_ app: Application, _ dbManager: DatabaseManager) throws {
         return HistoryResponse(
             entries: entries.map(ClipboardEntryResponse.init),
             total: try dbManager.getEntryCount()
+        )
+    }
+    
+    // GET /search?type=textual&query=database&limit=100
+    app.get("search") { req -> HistoryResponse in
+        let limit = try? req.query.get(Int.self, at: "limit")
+        let type = try? req.query.get(String.self, at: "type")
+        let query = try? req.query.get(String.self, at: "query")
+        let entries = try dbManager.searchEntries(type: type, query: query, limit: limit)
+        return HistoryResponse(
+            entries: entries.map(ClipboardEntryResponse.init),
+            total: entries.count
         )
     }
     
