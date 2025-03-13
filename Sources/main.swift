@@ -159,17 +159,28 @@ class DatabaseManager: @unchecked Sendable {
         }
     }
     
-    func getRecentEntries(limit: Int? = nil) throws -> [ClipboardEntry] {
+    func getRecentEntries(limit: Int? = nil, startDate: Date? = nil, endDate: Date? = nil) throws -> [ClipboardEntry] {
         try dbQueue.read { db in
-            var query = ClipboardEntry.order(Column("timestamp").desc)
-            if let limit = limit {
-                query = query.limit(limit)
+            var request = ClipboardEntry.order(Column("timestamp").desc)
+            
+            // Apply date range filters if provided
+            if let startDate = startDate {
+                request = request.filter(Column("timestamp") >= startDate)
             }
-            return try query.fetchAll(db)
+            if let endDate = endDate {
+                request = request.filter(Column("timestamp") <= endDate)
+            }
+            
+            // Apply limit if provided
+            if let limit = limit {
+                request = request.limit(limit)
+            }
+            
+            return try request.fetchAll(db)
         }
     }
     
-    func searchEntries(type: String? = nil, query: String? = nil, limit: Int? = nil) throws -> [ClipboardEntry] {
+    func searchEntries(type: String? = nil, query: String? = nil, startDate: Date? = nil, endDate: Date? = nil, limit: Int? = nil) throws -> [ClipboardEntry] {
         try dbQueue.read { db in
             var request = ClipboardEntry.order(Column("timestamp").desc)
             
@@ -194,6 +205,14 @@ class DatabaseManager: @unchecked Sendable {
             // Apply text search if query provided (case-insensitive)
             if let searchQuery = query {
                 request = request.filter(Column("content").like("%\(searchQuery)%").collating(.nocase))
+            }
+            
+            // Apply date range filters
+            if let start = startDate {
+                request = request.filter(Column("timestamp") >= start)
+            }
+            if let end = endDate {
+                request = request.filter(Column("timestamp") <= end)
             }
             
             if let limit = limit {
@@ -226,28 +245,108 @@ class DatabaseManager: @unchecked Sendable {
     }
 }
 
+// MARK: - Date Helpers
+struct DateRange {
+    let start: Date
+    let end: Date
+    
+    static func parseRelative(_ input: String, relativeTo now: Date = Date()) -> DateRange? {
+        // Format: "<number><unit>" e.g., "5m", "2h", "3d"
+        let pattern = #"^(\d+)([mhd])$"#
+        guard let regex = try? NSRegularExpression(pattern: pattern),
+              let match = regex.firstMatch(in: input, range: NSRange(input.startIndex..., in: input)) else {
+            return nil
+        }
+        
+        let nsInput = input as NSString
+        guard let amount = Int(nsInput.substring(with: match.range(at: 1))) else {
+            return nil
+        }
+        let unit = nsInput.substring(with: match.range(at: 2))
+        
+        let calendar = Calendar.current
+        let calendarUnit: Calendar.Component
+        switch unit {
+        case "m":
+            calendarUnit = .minute
+        case "h":
+            calendarUnit = .hour
+        case "d":
+            calendarUnit = .day
+        default:
+            return nil
+        }
+        
+        guard let startDate = calendar.date(byAdding: calendarUnit, value: -amount, to: now) else {
+            return nil
+        }
+        
+        return DateRange(start: startDate, end: now)
+    }
+}
+
 // MARK: - API Routes
 func setupRoutes(_ app: Application, _ dbManager: DatabaseManager) throws {
-    // GET /history?limit=100
+    // GET /history?limit=100&range=5m OR start=2025-03-13T00:00:00Z&end=2025-03-13T23:59:59Z
     app.get("history") { req -> HistoryResponse in
         let limit = try? req.query.get(Int.self, at: "limit")
-        let entries = try dbManager.getRecentEntries(limit: limit)
-        return HistoryResponse(
-            entries: entries.map(ClipboardEntryResponse.init),
-            total: try dbManager.getEntryCount()
+        
+        // Handle date range
+        var startDate: Date?
+        var endDate: Date?
+        
+        if let range = try? req.query.get(String.self, at: "range") {
+            // Use relative date range
+            if let dateRange = DateRange.parseRelative(range) {
+                startDate = dateRange.start
+                endDate = dateRange.end
+            }
+        } else {
+            // Use explicit ISO8601 dates if provided
+            let dateFormatter = ISO8601DateFormatter()
+            startDate = (try? req.query.get(String.self, at: "start")).flatMap { dateFormatter.date(from: $0) }
+            endDate = (try? req.query.get(String.self, at: "end")).flatMap { dateFormatter.date(from: $0) }
+        }
+        
+        let entries = try dbManager.getRecentEntries(
+            limit: limit,
+            startDate: startDate,
+            endDate: endDate
         )
+        return HistoryResponse(entries: entries.map(ClipboardEntryResponse.init), total: entries.count)
     }
     
-    // GET /search?type=textual&query=database&limit=100
+    // GET /search?type=textual&query=text&range=5m&limit=100
     app.get("search") { req -> HistoryResponse in
-        let limit = try? req.query.get(Int.self, at: "limit")
         let type = try? req.query.get(String.self, at: "type")
         let query = try? req.query.get(String.self, at: "query")
-        let entries = try dbManager.searchEntries(type: type, query: query, limit: limit)
-        return HistoryResponse(
-            entries: entries.map(ClipboardEntryResponse.init),
-            total: entries.count
+        let limit = try? req.query.get(Int.self, at: "limit")
+        
+        // Handle date range
+        var startDate: Date?
+        var endDate: Date?
+        
+        if let range = try? req.query.get(String.self, at: "range") {
+            // Use relative date range
+            if let dateRange = DateRange.parseRelative(range) {
+                startDate = dateRange.start
+                endDate = dateRange.end
+            }
+        } else {
+            // Use explicit ISO8601 dates if provided
+            let dateFormatter = ISO8601DateFormatter()
+            startDate = (try? req.query.get(String.self, at: "start")).flatMap { dateFormatter.date(from: $0) }
+            endDate = (try? req.query.get(String.self, at: "end")).flatMap { dateFormatter.date(from: $0) }
+        }
+        
+        let entries = try dbManager.searchEntries(
+            type: type,
+            query: query,
+            startDate: startDate,
+            endDate: endDate,
+            limit: limit
         )
+        return HistoryResponse(entries: entries.map(ClipboardEntryResponse.init), total: entries.count)
     }
     
     // DELETE /history?limit=100
