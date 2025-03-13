@@ -1,9 +1,29 @@
-// The Swift Programming Language
-// https://docs.swift.org/swift-book
-
 import Foundation
 import AppKit
 import GRDB
+import Vapor
+
+// MARK: - API Models
+struct HistoryResponse: Content {
+    let entries: [ClipboardEntryResponse]
+    let total: Int
+}
+
+struct ClipboardEntryResponse: Content {
+    let id: Int64
+    let content: String
+    let type: String
+    let timestamp: Date
+    let isTextual: Bool
+    
+    init(from entry: ClipboardEntry) {
+        self.id = entry.id ?? 0
+        self.content = entry.content
+        self.type = entry.type
+        self.timestamp = entry.timestamp
+        self.isTextual = entry.isTextual
+    }
+}
 
 // MARK: - Clipboard History
 struct ClipboardEntry: Codable, FetchableRecord, PersistableRecord {
@@ -23,7 +43,7 @@ struct ClipboardEntry: Codable, FetchableRecord, PersistableRecord {
 }
 
 // MARK: - Database Management
-class DatabaseManager {
+class DatabaseManager: @unchecked Sendable {
     private let dbQueue: DatabaseQueue
     private let maxEntries: Int
     
@@ -139,12 +159,28 @@ class DatabaseManager {
         }
     }
     
-    func getRecentEntries(limit: Int = 100) throws -> [ClipboardEntry] {
+    func getRecentEntries(limit: Int? = nil) throws -> [ClipboardEntry] {
         try dbQueue.read { db in
-            try ClipboardEntry
-                .order(Column("timestamp").desc)
-                .limit(limit)
-                .fetchAll(db)
+            var query = ClipboardEntry.order(Column("timestamp").desc)
+            if let limit = limit {
+                query = query.limit(limit)
+            }
+            return try query.fetchAll(db)
+        }
+    }
+    
+    func deleteEntries(limit: Int? = nil) throws -> Int {
+        try dbQueue.write { db in
+            if let limit = limit {
+                // Delete the oldest entries
+                return try ClipboardEntry
+                    .order(Column("timestamp"))
+                    .limit(limit)
+                    .deleteAll(db)
+            } else {
+                // Delete all entries
+                return try ClipboardEntry.deleteAll(db)
+            }
         }
     }
     
@@ -152,6 +188,33 @@ class DatabaseManager {
         try dbQueue.read { db in
             try ClipboardEntry.fetchCount(db)
         }
+    }
+}
+
+// MARK: - API Routes
+func setupRoutes(_ app: Application, _ dbManager: DatabaseManager) throws {
+    // GET /history?limit=100
+    app.get("history") { req -> HistoryResponse in
+        let limit = try? req.query.get(Int.self, at: "limit")
+        let entries = try dbManager.getRecentEntries(limit: limit)
+        return HistoryResponse(
+            entries: entries.map(ClipboardEntryResponse.init),
+            total: try dbManager.getEntryCount()
+        )
+    }
+    
+    // DELETE /history?limit=100
+    app.delete("history") { req -> Response in
+        let limit = try? req.query.get(Int.self, at: "limit")
+        let deletedCount = try dbManager.deleteEntries(limit: limit)
+        let remainingCount = try dbManager.getEntryCount()
+        
+        let response = Response(status: .ok)
+        try response.content.encode([
+            "deletedCount": deletedCount,
+            "remainingCount": remainingCount
+        ])
+        return response
     }
 }
 
@@ -293,10 +356,27 @@ class ClipboardMonitor {
 // MARK: - Main
 print("Starting Kopya clipboard manager...")
 
-// Create a background thread for monitoring
+// Create a shared database manager
+let dbManager = try DatabaseManager(maxEntries: 1000)
+
+// Configure and start Vapor server
+let app = try Application(.detect())
+try setupRoutes(app, dbManager)
+
+// Start the web server in a background thread
 Thread.detachNewThread {
     do {
-        _ = try ClipboardMonitor(maxEntries: 1000)  // Keep last 1000 entries
+        try app.run()
+    } catch {
+        print("Error starting web server:", error)
+        exit(1)
+    }
+}
+
+// Create a background thread for clipboard monitoring
+Thread.detachNewThread {
+    do {
+        _ = try ClipboardMonitor(maxEntries: 1000)
     } catch {
         print("Error initializing ClipboardMonitor:", error)
         exit(1)
