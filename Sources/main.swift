@@ -27,6 +27,8 @@ struct ClipboardEntryResponse: Content {
 
 // MARK: - Clipboard History
 struct ClipboardEntry: Codable, FetchableRecord, PersistableRecord {
+    static let databaseTableName = "clipboard_entries"
+    
     let id: Int64?
     let content: String
     let type: String  // Store as string since NSPasteboard.PasteboardType isn't Codable
@@ -47,200 +49,169 @@ class DatabaseManager: @unchecked Sendable {
     private let dbQueue: DatabaseQueue
     private let maxEntries: Int
     
-    init(maxEntries: Int = 1000) throws {
+    init(databasePath: String? = nil, maxEntries: Int = 1000) throws {
+        let path = databasePath ?? "\(NSHomeDirectory())/Library/Application Support/Kopya/history.db"
+        
+        // Ensure directory exists
+        try FileManager.default.createDirectory(
+            atPath: (path as NSString).deletingLastPathComponent,
+            withIntermediateDirectories: true
+        )
+        
+        self.dbQueue = try DatabaseQueue(path: path)
         self.maxEntries = maxEntries
         
-        let fileManager = FileManager.default
-        let appSupport = try fileManager.url(for: .applicationSupportDirectory,
-                                           in: .userDomainMask,
-                                           appropriateFor: nil,
-                                           create: true)
-        let dbPath = appSupport.appendingPathComponent("Kopya").appendingPathComponent("clipboard.sqlite")
-        
-        // Create directory if needed
-        try fileManager.createDirectory(at: dbPath.deletingLastPathComponent(),
-                                      withIntermediateDirectories: true)
-        
-        dbQueue = try DatabaseQueue(path: dbPath.path)
-        
-        // Setup database schema
-        try migrator.migrate(dbQueue)
-        
-        // Initial cleanup of any duplicates from previous runs
-        try cleanupDuplicates()
-    }
-    
-    private var migrator: DatabaseMigrator {
-        var migrator = DatabaseMigrator()
-        
-        migrator.registerMigration("createClipboardEntries") { db in
-            try db.create(table: "clipboardEntry") { t in
+        // Initialize database schema
+        try dbQueue.write { db in
+            try db.create(table: "clipboard_entries", ifNotExists: true) { t in
                 t.autoIncrementedPrimaryKey("id")
                 t.column("content", .text).notNull()
                 t.column("type", .text).notNull()
                 t.column("timestamp", .datetime).notNull()
+                t.uniqueKey(["content"])  // Ensure content is unique
             }
-            
-            // Create index for timestamp column
-            try db.create(index: "clipboardEntry_timestamp_idx",
-                         on: "clipboardEntry",
-                         columns: ["timestamp"])
-            
-            // Create index for content for faster duplicate checking
-            try db.create(index: "clipboardEntry_content_idx",
-                         on: "clipboardEntry",
-                         columns: ["content"])
         }
         
-        return migrator
-    }
-    
-    private func cleanupDuplicates() throws {
+        // Clean up duplicate entries on startup
         try dbQueue.write { db in
-            // Delete all but the most recent entry for each unique content
             try db.execute(sql: """
-                DELETE FROM clipboardEntry
+                DELETE FROM clipboard_entries
                 WHERE id NOT IN (
                     SELECT MAX(id)
-                    FROM clipboardEntry
+                    FROM clipboard_entries
                     GROUP BY content
                 )
-            """)
-            
-            // Ensure we're within maxEntries limit
-            let count = try ClipboardEntry.fetchCount(db)
-            if count > maxEntries {
-                let deleteCount = count - maxEntries
-                try ClipboardEntry
-                    .order(Column("timestamp"))
-                    .limit(deleteCount)
-                    .deleteAll(db)
-                print("Cleaned up \(deleteCount) old entries during initialization")
-            }
+                """)
         }
     }
     
     func saveEntry(_ entry: ClipboardEntry) throws -> Bool {
         try dbQueue.write { db in
-            // Check if this exact content already exists
-            let exists = try ClipboardEntry
-                .filter(Column("content") == entry.content)
-                .fetchCount(db) > 0
+            // Check if content already exists
+            let existingCount = try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM clipboard_entries WHERE content = ?", arguments: [entry.content]) ?? 0
             
-            // Only insert if it's not a duplicate
-            if !exists {
+            if existingCount == 0 {
                 // Insert new entry
+                let entry = entry
                 try entry.insert(db)
                 
-                // Get count of entries
-                let count = try ClipboardEntry.fetchCount(db)
-                
-                // If we exceed maxEntries, delete oldest entries
-                if count > maxEntries {
-                    let deleteCount = count - maxEntries
-                    try ClipboardEntry
-                        .order(Column("timestamp"))
-                        .limit(deleteCount)
-                        .deleteAll(db)
-                    
-                    print("Cleaned up \(deleteCount) old entries")
+                // Clean up old entries if we exceed the limit
+                let totalCount = try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM clipboard_entries") ?? 0
+                if totalCount > maxEntries {
+                    try db.execute(sql: """
+                        DELETE FROM clipboard_entries
+                        WHERE id NOT IN (
+                            SELECT id FROM clipboard_entries
+                            ORDER BY timestamp DESC
+                            LIMIT ?
+                        )
+                        """,
+                        arguments: [maxEntries])
                 }
+                
                 return true
             } else {
                 // Update timestamp of existing entry to mark it as most recent
                 try db.execute(sql: """
-                    UPDATE clipboardEntry
+                    UPDATE clipboard_entries
                     SET timestamp = ?
                     WHERE content = ?
                     """,
                     arguments: [entry.timestamp, entry.content])
+                
                 return false
             }
         }
     }
     
-    func getRecentEntries(limit: Int? = nil, startDate: Date? = nil, endDate: Date? = nil) throws -> [ClipboardEntry] {
-        try dbQueue.read { db in
-            var request = ClipboardEntry.order(Column("timestamp").desc)
-            
-            // Apply date range filters if provided
-            if let startDate = startDate {
-                request = request.filter(Column("timestamp") >= startDate)
-            }
-            if let endDate = endDate {
-                request = request.filter(Column("timestamp") <= endDate)
-            }
-            
-            // Apply limit if provided
-            if let limit = limit {
-                request = request.limit(limit)
-            }
-            
-            return try request.fetchAll(db)
-        }
-    }
-    
     func searchEntries(type: String? = nil, query: String? = nil, startDate: Date? = nil, endDate: Date? = nil, limit: Int? = nil) throws -> [ClipboardEntry] {
         try dbQueue.read { db in
-            var request = ClipboardEntry.order(Column("timestamp").desc)
+            var sql = "SELECT * FROM clipboard_entries"
+            var conditions: [String] = []
+            var arguments: [DatabaseValueConvertible] = []
             
-            // Apply type filter
             if let type = type {
+                // Handle common type aliases
+                let typeCondition: String
                 switch type.lowercased() {
-                case "textual":
-                    let textualTypes = [
-                        NSPasteboard.PasteboardType.string.rawValue,
-                        NSPasteboard.PasteboardType.URL.rawValue,
-                        NSPasteboard.PasteboardType.fileURL.rawValue,
-                        NSPasteboard.PasteboardType.rtf.rawValue
-                    ]
-                    request = request.filter(textualTypes.contains(Column("type")))
                 case "url":
-                    request = request.filter(Column("type") == NSPasteboard.PasteboardType.URL.rawValue)
+                    typeCondition = "type LIKE '%url%'"
+                case "text", "textual":
+                    typeCondition = "type LIKE '%text%' OR type LIKE '%rtf%'"
                 default:
-                    request = request.filter(Column("type") == type)
+                    typeCondition = "type = ?"
+                    arguments.append(type)
                 }
+                conditions.append(typeCondition)
             }
             
-            // Apply text search if query provided (case-insensitive)
-            if let searchQuery = query {
-                request = request.filter(Column("content").like("%\(searchQuery)%").collating(.nocase))
+            if let query = query {
+                conditions.append("content LIKE ?")
+                arguments.append("%\(query)%")
             }
             
-            // Apply date range filters
-            if let start = startDate {
-                request = request.filter(Column("timestamp") >= start)
+            if let startDate = startDate {
+                conditions.append("timestamp >= ?")
+                arguments.append(startDate)
             }
-            if let end = endDate {
-                request = request.filter(Column("timestamp") <= end)
+            
+            if let endDate = endDate {
+                conditions.append("timestamp <= ?")
+                arguments.append(endDate)
             }
+            
+            if !conditions.isEmpty {
+                sql += " WHERE " + conditions.joined(separator: " AND ")
+            }
+            
+            sql += " ORDER BY timestamp DESC"
             
             if let limit = limit {
-                request = request.limit(limit)
+                sql += " LIMIT ?"
+                arguments.append(limit)
             }
             
-            return try request.fetchAll(db)
+            return try ClipboardEntry.fetchAll(db, sql: sql, arguments: StatementArguments(arguments))
         }
     }
     
-    func deleteEntries(limit: Int? = nil) throws -> Int {
-        try dbQueue.write { db in
-            if let limit = limit {
-                // Delete the oldest entries
-                return try ClipboardEntry
-                    .order(Column("timestamp"))
-                    .limit(limit)
-                    .deleteAll(db)
-            } else {
-                // Delete all entries
-                return try ClipboardEntry.deleteAll(db)
-            }
-        }
+    func getRecentEntries(limit: Int? = nil, startDate: Date? = nil, endDate: Date? = nil) throws -> [ClipboardEntry] {
+        try searchEntries(startDate: startDate, endDate: endDate, limit: limit)
     }
     
     func getEntryCount() throws -> Int {
         try dbQueue.read { db in
-            try ClipboardEntry.fetchCount(db)
+            try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM clipboard_entries") ?? 0
+        }
+    }
+    
+    func deleteAllEntries() throws {
+        try dbQueue.write { db in
+            try db.execute(sql: "DELETE FROM clipboard_entries")
+        }
+    }
+    
+    func deleteEntries(limit: Int? = nil) throws -> (deletedCount: Int, remainingCount: Int) {
+        try dbQueue.write { db in
+            let totalCount = try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM clipboard_entries") ?? 0
+            
+            if let limit = limit {
+                try db.execute(sql: """
+                    DELETE FROM clipboard_entries
+                    WHERE id IN (
+                        SELECT id
+                        FROM clipboard_entries
+                        ORDER BY timestamp DESC
+                        LIMIT ?
+                    )
+                    """,
+                    arguments: [limit])
+            } else {
+                try db.execute(sql: "DELETE FROM clipboard_entries")
+            }
+            
+            let remainingCount = try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM clipboard_entries") ?? 0
+            return (totalCount - remainingCount, remainingCount)
         }
     }
 }
@@ -251,61 +222,60 @@ struct DateRange {
     let end: Date
     
     static func parseRelative(_ input: String, relativeTo now: Date = Date()) -> DateRange? {
-        // Format: "<number><unit>" e.g., "5m", "2h", "3d"
-        let pattern = #"^(\d+)([mhd])$"#
-        guard let regex = try? NSRegularExpression(pattern: pattern),
-              let match = regex.firstMatch(in: input, range: NSRange(input.startIndex..., in: input)) else {
+        // Parse number and unit
+        guard let number = Int(String(input.dropLast())),
+              let unit = input.last else {
             return nil
         }
         
-        let nsInput = input as NSString
-        guard let amount = Int(nsInput.substring(with: match.range(at: 1))) else {
+        guard number > 0 else {
             return nil
         }
-        let unit = nsInput.substring(with: match.range(at: 2))
         
         let calendar = Calendar.current
-        let calendarUnit: Calendar.Component
+        var components = DateComponents()
+        
         switch unit {
         case "m":
-            calendarUnit = .minute
+            components.minute = -number
         case "h":
-            calendarUnit = .hour
+            components.hour = -number
         case "d":
-            calendarUnit = .day
+            components.day = -number
         default:
             return nil
         }
         
-        guard let startDate = calendar.date(byAdding: calendarUnit, value: -amount, to: now) else {
+        guard let start = calendar.date(byAdding: components, to: now) else {
             return nil
         }
         
-        return DateRange(start: startDate, end: now)
+        return DateRange(start: start, end: now)
     }
 }
 
 // MARK: - API Routes
 func setupRoutes(_ app: Application, _ dbManager: DatabaseManager) throws {
-    // GET /history?limit=100&range=5m OR start=2025-03-13T00:00:00Z&end=2025-03-13T23:59:59Z
+    // GET /history?range=1h&limit=100
     app.get("history") { req -> HistoryResponse in
         let limit = try? req.query.get(Int.self, at: "limit")
+        let range = try? req.query.get(String.self, at: "range")
         
         // Handle date range
         var startDate: Date?
         var endDate: Date?
         
-        if let range = try? req.query.get(String.self, at: "range") {
-            // Use relative date range
-            if let dateRange = DateRange.parseRelative(range) {
+        if let rangeStr = range {
+            // Try relative format first
+            if let dateRange = DateRange.parseRelative(rangeStr) {
                 startDate = dateRange.start
                 endDate = dateRange.end
+            } else {
+                // Try explicit ISO8601 dates
+                let formatter = ISO8601DateFormatter()
+                startDate = (try? req.query.get(String.self, at: "start")).flatMap { formatter.date(from: $0) }
+                endDate = (try? req.query.get(String.self, at: "end")).flatMap { formatter.date(from: $0) }
             }
-        } else {
-            // Use explicit ISO8601 dates if provided
-            let dateFormatter = ISO8601DateFormatter()
-            startDate = (try? req.query.get(String.self, at: "start")).flatMap { dateFormatter.date(from: $0) }
-            endDate = (try? req.query.get(String.self, at: "end")).flatMap { dateFormatter.date(from: $0) }
         }
         
         let entries = try dbManager.getRecentEntries(
@@ -316,27 +286,28 @@ func setupRoutes(_ app: Application, _ dbManager: DatabaseManager) throws {
         return HistoryResponse(entries: entries.map(ClipboardEntryResponse.init), total: entries.count)
     }
     
-    // GET /search?type=textual&query=text&range=5m&limit=100
+    // GET /search?type=url&query=example&range=1h
     app.get("search") { req -> HistoryResponse in
         let type = try? req.query.get(String.self, at: "type")
         let query = try? req.query.get(String.self, at: "query")
+        let range = try? req.query.get(String.self, at: "range")
         let limit = try? req.query.get(Int.self, at: "limit")
         
         // Handle date range
         var startDate: Date?
         var endDate: Date?
         
-        if let range = try? req.query.get(String.self, at: "range") {
-            // Use relative date range
-            if let dateRange = DateRange.parseRelative(range) {
+        if let rangeStr = range {
+            // Try relative format first
+            if let dateRange = DateRange.parseRelative(rangeStr) {
                 startDate = dateRange.start
                 endDate = dateRange.end
+            } else {
+                // Try explicit ISO8601 dates
+                let formatter = ISO8601DateFormatter()
+                startDate = (try? req.query.get(String.self, at: "start")).flatMap { formatter.date(from: $0) }
+                endDate = (try? req.query.get(String.self, at: "end")).flatMap { formatter.date(from: $0) }
             }
-        } else {
-            // Use explicit ISO8601 dates if provided
-            let dateFormatter = ISO8601DateFormatter()
-            startDate = (try? req.query.get(String.self, at: "start")).flatMap { dateFormatter.date(from: $0) }
-            endDate = (try? req.query.get(String.self, at: "end")).flatMap { dateFormatter.date(from: $0) }
         }
         
         let entries = try dbManager.searchEntries(
@@ -352,9 +323,7 @@ func setupRoutes(_ app: Application, _ dbManager: DatabaseManager) throws {
     // DELETE /history?limit=100
     app.delete("history") { req -> Response in
         let limit = try? req.query.get(Int.self, at: "limit")
-        let deletedCount = try dbManager.deleteEntries(limit: limit)
-        let remainingCount = try dbManager.getEntryCount()
-        
+        let (deletedCount, remainingCount) = try dbManager.deleteEntries(limit: limit)
         let response = Response(status: .ok)
         try response.content.encode([
             "deletedCount": deletedCount,
@@ -427,10 +396,10 @@ class ClipboardMonitor {
                         )
                         
                         do {
-                            let isNewEntry = try dbManager.saveEntry(entry)
+                            let saved = try dbManager.saveEntry(entry)
                             let entryCount = try dbManager.getEntryCount()
                             
-                            if isNewEntry {
+                            if saved {
                                 print("\nStored new clipboard content:")
                             } else {
                                 print("\nUpdated existing clipboard content:")

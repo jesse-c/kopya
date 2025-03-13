@@ -18,6 +18,15 @@ let package = Package(
             dependencies: [
                 .product(name: "GRDB", package: "GRDB.swift"),
                 .product(name: "Vapor", package: "vapor")
-            ])
+            ],
+            path: "Sources"
+        ),
+        .testTarget(
+            name: "KopyaTests",
+            dependencies: [
+                "Kopya",
+                .product(name: "XCTVapor", package: "vapor")
+            ]
+        )
     ]
 )
