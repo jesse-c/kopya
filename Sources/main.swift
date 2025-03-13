@@ -3,15 +3,155 @@
 
 import Foundation
 import AppKit
+import GRDB
 
 // MARK: - Clipboard History
-struct ClipboardEntry {
+struct ClipboardEntry: Codable, FetchableRecord, PersistableRecord {
+    let id: Int64?
     let content: String
-    let type: NSPasteboard.PasteboardType
+    let type: String  // Store as string since NSPasteboard.PasteboardType isn't Codable
     let timestamp: Date
     
     var isTextual: Bool {
-        [.string, .URL, .fileURL, .rtf].contains(type)
+        [
+            NSPasteboard.PasteboardType.string.rawValue,
+            NSPasteboard.PasteboardType.URL.rawValue,
+            NSPasteboard.PasteboardType.fileURL.rawValue,
+            NSPasteboard.PasteboardType.rtf.rawValue
+        ].contains(type)
+    }
+}
+
+// MARK: - Database Management
+class DatabaseManager {
+    private let dbQueue: DatabaseQueue
+    private let maxEntries: Int
+    
+    init(maxEntries: Int = 1000) throws {
+        self.maxEntries = maxEntries
+        
+        let fileManager = FileManager.default
+        let appSupport = try fileManager.url(for: .applicationSupportDirectory,
+                                           in: .userDomainMask,
+                                           appropriateFor: nil,
+                                           create: true)
+        let dbPath = appSupport.appendingPathComponent("Kopya").appendingPathComponent("clipboard.sqlite")
+        
+        // Create directory if needed
+        try fileManager.createDirectory(at: dbPath.deletingLastPathComponent(),
+                                      withIntermediateDirectories: true)
+        
+        dbQueue = try DatabaseQueue(path: dbPath.path)
+        
+        // Setup database schema
+        try migrator.migrate(dbQueue)
+        
+        // Initial cleanup of any duplicates from previous runs
+        try cleanupDuplicates()
+    }
+    
+    private var migrator: DatabaseMigrator {
+        var migrator = DatabaseMigrator()
+        
+        migrator.registerMigration("createClipboardEntries") { db in
+            try db.create(table: "clipboardEntry") { t in
+                t.autoIncrementedPrimaryKey("id")
+                t.column("content", .text).notNull()
+                t.column("type", .text).notNull()
+                t.column("timestamp", .datetime).notNull()
+            }
+            
+            // Create index for timestamp column
+            try db.create(index: "clipboardEntry_timestamp_idx",
+                         on: "clipboardEntry",
+                         columns: ["timestamp"])
+            
+            // Create index for content for faster duplicate checking
+            try db.create(index: "clipboardEntry_content_idx",
+                         on: "clipboardEntry",
+                         columns: ["content"])
+        }
+        
+        return migrator
+    }
+    
+    private func cleanupDuplicates() throws {
+        try dbQueue.write { db in
+            // Delete all but the most recent entry for each unique content
+            try db.execute(sql: """
+                DELETE FROM clipboardEntry
+                WHERE id NOT IN (
+                    SELECT MAX(id)
+                    FROM clipboardEntry
+                    GROUP BY content
+                )
+            """)
+            
+            // Ensure we're within maxEntries limit
+            let count = try ClipboardEntry.fetchCount(db)
+            if count > maxEntries {
+                let deleteCount = count - maxEntries
+                try ClipboardEntry
+                    .order(Column("timestamp"))
+                    .limit(deleteCount)
+                    .deleteAll(db)
+                print("Cleaned up \(deleteCount) old entries during initialization")
+            }
+        }
+    }
+    
+    func saveEntry(_ entry: ClipboardEntry) throws -> Bool {
+        try dbQueue.write { db in
+            // Check if this exact content already exists
+            let exists = try ClipboardEntry
+                .filter(Column("content") == entry.content)
+                .fetchCount(db) > 0
+            
+            // Only insert if it's not a duplicate
+            if !exists {
+                // Insert new entry
+                try entry.insert(db)
+                
+                // Get count of entries
+                let count = try ClipboardEntry.fetchCount(db)
+                
+                // If we exceed maxEntries, delete oldest entries
+                if count > maxEntries {
+                    let deleteCount = count - maxEntries
+                    try ClipboardEntry
+                        .order(Column("timestamp"))
+                        .limit(deleteCount)
+                        .deleteAll(db)
+                    
+                    print("Cleaned up \(deleteCount) old entries")
+                }
+                return true
+            } else {
+                // Update timestamp of existing entry to mark it as most recent
+                try db.execute(sql: """
+                    UPDATE clipboardEntry
+                    SET timestamp = ?
+                    WHERE content = ?
+                    """,
+                    arguments: [entry.timestamp, entry.content])
+                return false
+            }
+        }
+    }
+    
+    func getRecentEntries(limit: Int = 100) throws -> [ClipboardEntry] {
+        try dbQueue.read { db in
+            try ClipboardEntry
+                .order(Column("timestamp").desc)
+                .limit(limit)
+                .fetchAll(db)
+        }
+    }
+    
+    func getEntryCount() throws -> Int {
+        try dbQueue.read { db in
+            try ClipboardEntry.fetchCount(db)
+        }
     }
 }
 
@@ -19,9 +159,9 @@ struct ClipboardEntry {
 @available(macOS 13.0, *)
 class ClipboardMonitor {
     private let pasteboard = NSPasteboard.general
-    private var history: [ClipboardEntry] = []
     private var lastContent: String?
-    private var lastChangeCount: Int = 0
+    private var lastChangeCount: Int
+    private let dbManager: DatabaseManager
     
     // Types in order of priority
     private let monitoredTypes: [(NSPasteboard.PasteboardType, String)] = [
@@ -34,7 +174,15 @@ class ClipboardMonitor {
         (.tiff, "public.tiff")
     ]
     
-    init() {
+    init(maxEntries: Int = 1000) throws {
+        self.dbManager = try DatabaseManager(maxEntries: maxEntries)
+        self.lastChangeCount = NSPasteboard.general.changeCount
+        
+        // Print initial stats without processing current clipboard content
+        let entryCount = try dbManager.getEntryCount()
+        print("Database initialized with \(entryCount) entries")
+        print("Maximum entries set to: \(maxEntries)")
+        
         startMonitoring()
     }
     
@@ -60,22 +208,38 @@ class ClipboardMonitor {
                 }
                 
                 if let (type, rawType) = availableType,
-                   let clipboardString = getString(for: type, rawType: rawType),
-                   clipboardString != lastContent {
-                    lastContent = clipboardString
-                    let entry = ClipboardEntry(
-                        content: clipboardString,
-                        type: type,
-                        timestamp: Date()
-                    )
-                    history.append(entry)
-                    print("\nStored new clipboard content:")
-                    print("  Type: \(rawType)")
-                    print("  Content: \(clipboardString)")
-                    
-                    // Print additional info for non-textual content
-                    if !entry.isTextual {
-                        print("  Size: \(clipboardString.count) bytes")
+                   let clipboardString = getString(for: type, rawType: rawType) {
+                    // Only process if content has actually changed
+                    if clipboardString != lastContent {
+                        lastContent = clipboardString
+                        let entry = ClipboardEntry(
+                            id: nil,
+                            content: clipboardString,
+                            type: type.rawValue,
+                            timestamp: Date()
+                        )
+                        
+                        do {
+                            let isNewEntry = try dbManager.saveEntry(entry)
+                            let entryCount = try dbManager.getEntryCount()
+                            
+                            if isNewEntry {
+                                print("\nStored new clipboard content:")
+                            } else {
+                                print("\nUpdated existing clipboard content:")
+                            }
+                            print("  Type: \(rawType)")
+                            print("  Content: \(clipboardString)")
+                            
+                            // Print additional info for non-textual content
+                            if !entry.isTextual {
+                                print("  Size: \(clipboardString.count) bytes")
+                            }
+                            
+                            print("  Current entries in database: \(entryCount)")
+                        } catch {
+                            print("Error saving clipboard entry:", error)
+                        }
                     }
                 }
                 Thread.sleep(forTimeInterval: 0.5)
@@ -131,7 +295,12 @@ print("Starting Kopya clipboard manager...")
 
 // Create a background thread for monitoring
 Thread.detachNewThread {
-    _ = ClipboardMonitor()
+    do {
+        _ = try ClipboardMonitor(maxEntries: 1000)  // Keep last 1000 entries
+    } catch {
+        print("Error initializing ClipboardMonitor:", error)
+        exit(1)
+    }
 }
 
 // Keep main thread running
