@@ -10,14 +10,14 @@ struct HistoryResponse: Content {
 }
 
 struct ClipboardEntryResponse: Content {
-    let id: Int64
+    let id: UUID
     let content: String
     let type: String
     let timestamp: Date
     let isTextual: Bool
     
     init(from entry: ClipboardEntry) {
-        self.id = entry.id ?? 0
+        self.id = entry.id ?? UUID()
         self.content = entry.content
         self.type = entry.type
         self.timestamp = entry.timestamp
@@ -29,7 +29,7 @@ struct ClipboardEntryResponse: Content {
 struct ClipboardEntry: Codable, FetchableRecord, PersistableRecord {
     static let databaseTableName = "clipboard_entries"
     
-    let id: Int64?
+    var id: UUID?
     let content: String
     let type: String  // Store as string since NSPasteboard.PasteboardType isn't Codable
     let timestamp: Date
@@ -41,6 +41,31 @@ struct ClipboardEntry: Codable, FetchableRecord, PersistableRecord {
             NSPasteboard.PasteboardType.fileURL.rawValue,
             NSPasteboard.PasteboardType.rtf.rawValue
         ].contains(type)
+    }
+    
+    init(id: UUID? = nil, content: String, type: String, timestamp: Date) {
+        self.id = id ?? UUID()
+        self.content = content
+        self.type = type
+        self.timestamp = timestamp
+    }
+    
+    // Override database encoding to ensure proper UUID format
+    func encode(to container: inout PersistenceContainer) throws {
+        container["id"] = id?.uuidString
+        container["content"] = content
+        container["type"] = type
+        container["timestamp"] = timestamp
+    }
+    
+    // Override database decoding to handle UUID format
+    init(row: Row) throws {
+        if let uuidString = row["id"] as String? {
+            self.id = UUID(uuidString: uuidString)
+        }
+        self.content = row["content"]
+        self.type = row["type"]
+        self.timestamp = row["timestamp"]
     }
 }
 
@@ -61,10 +86,13 @@ class DatabaseManager: @unchecked Sendable {
         self.dbQueue = try DatabaseQueue(path: path)
         self.maxEntries = maxEntries
         
+        // Check and perform migration if needed
+        try migrateToUUID(db: dbQueue)
+        
         // Initialize database schema
         try dbQueue.write { db in
             try db.create(table: "clipboard_entries", ifNotExists: true) { t in
-                t.autoIncrementedPrimaryKey("id")
+                t.column("id", .text).primaryKey().notNull()  // UUID stored as text
                 t.column("content", .text).notNull()
                 t.column("type", .text).notNull()
                 t.column("timestamp", .datetime).notNull()
@@ -85,6 +113,68 @@ class DatabaseManager: @unchecked Sendable {
         }
     }
     
+    private func migrateToUUID(db: DatabaseQueue) throws {
+        try db.write { db in
+            // Check if we need migration by looking at table structure
+            let columns = try db.columns(in: "clipboard_entries")
+            let idColumn = columns.first { $0.name == "id" }
+            
+            if idColumn?.type.lowercased() != "text" {
+                // Create temporary table with new schema
+                try db.execute(sql: """
+                    CREATE TABLE clipboard_entries_new (
+                        id TEXT PRIMARY KEY NOT NULL,
+                        content TEXT NOT NULL,
+                        type TEXT NOT NULL,
+                        timestamp DATETIME NOT NULL,
+                        UNIQUE(content)
+                    )
+                    """)
+                
+                // Copy data with proper UUID conversion
+                try db.execute(sql: """
+                    INSERT INTO clipboard_entries_new (id, content, type, timestamp)
+                    SELECT uuid(), content, type, timestamp
+                    FROM clipboard_entries
+                    """)
+                
+                // Drop old table and rename new one
+                try db.execute(sql: "DROP TABLE clipboard_entries")
+                try db.execute(sql: "ALTER TABLE clipboard_entries_new RENAME TO clipboard_entries")
+            } else {
+                // Check if UUIDs need reformatting
+                let malformedUUIDs = try Int.fetchOne(db, sql: """
+                    SELECT COUNT(*) FROM clipboard_entries 
+                    WHERE id NOT LIKE '%-%'
+                    """) ?? 0
+                
+                if malformedUUIDs > 0 {
+                    // Create temporary table
+                    try db.execute(sql: """
+                        CREATE TABLE clipboard_entries_new (
+                            id TEXT PRIMARY KEY NOT NULL,
+                            content TEXT NOT NULL,
+                            type TEXT NOT NULL,
+                            timestamp DATETIME NOT NULL,
+                            UNIQUE(content)
+                        )
+                        """)
+                    
+                    // Copy data with UUID reformatting
+                    try db.execute(sql: """
+                        INSERT INTO clipboard_entries_new (id, content, type, timestamp)
+                        SELECT uuid(), content, type, timestamp
+                        FROM clipboard_entries
+                        """)
+                    
+                    // Drop old table and rename new one
+                    try db.execute(sql: "DROP TABLE clipboard_entries")
+                    try db.execute(sql: "ALTER TABLE clipboard_entries_new RENAME TO clipboard_entries")
+                }
+            }
+        }
+    }
+    
     func saveEntry(_ entry: ClipboardEntry) throws -> Bool {
         try dbQueue.write { db in
             // Check if content already exists
@@ -92,7 +182,10 @@ class DatabaseManager: @unchecked Sendable {
             
             if existingCount == 0 {
                 // Insert new entry
-                let entry = entry
+                var entry = entry
+                if entry.id == nil {
+                    entry.id = UUID()
+                }
                 try entry.insert(db)
                 
                 // Clean up old entries if we exceed the limit
