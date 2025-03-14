@@ -13,6 +13,7 @@ struct ClipboardEntryResponse: Content {
     let id: UUID
     let content: String
     let type: String
+    let humanReadableType: String?
     let timestamp: Date
     let isTextual: Bool
     
@@ -20,6 +21,7 @@ struct ClipboardEntryResponse: Content {
         self.id = entry.id ?? UUID()
         self.content = entry.content
         self.type = entry.type
+        self.humanReadableType = entry.humanReadableType
         self.timestamp = entry.timestamp
         self.isTextual = entry.isTextual
     }
@@ -41,6 +43,32 @@ struct ClipboardEntry: Codable, FetchableRecord, PersistableRecord {
             NSPasteboard.PasteboardType.fileURL.rawValue,
             NSPasteboard.PasteboardType.rtf.rawValue
         ].contains(type)
+    }
+    
+    var humanReadableType: String {
+        switch type {
+        case NSPasteboard.PasteboardType.string.rawValue:
+            return "Text"
+        case NSPasteboard.PasteboardType.URL.rawValue:
+            return "URL"
+        case NSPasteboard.PasteboardType.fileURL.rawValue:
+            return "File URL"
+        case NSPasteboard.PasteboardType.rtf.rawValue:
+            return "RTF"
+        case NSPasteboard.PasteboardType.pdf.rawValue:
+            return "PDF"
+        case NSPasteboard.PasteboardType.png.rawValue:
+            return "PNG"
+        case NSPasteboard.PasteboardType.tiff.rawValue:
+            return "TIFF"
+        default:
+            // Extract the format from UTI if possible
+            let components = type.components(separatedBy: ".")
+            if components.count > 1, let lastComponent = components.last {
+                return lastComponent.uppercased()
+            }
+            return type
+        }
     }
     
     init(id: UUID? = nil, content: String, type: String, timestamp: Date) {
@@ -432,7 +460,7 @@ class ClipboardMonitor {
                             } else {
                                 print("\nUpdated existing clipboard content:")
                             }
-                            print("  Type: \(rawType)")
+                            print("  Type: \(entry.humanReadableType)")
                             print("  Content: \(clipboardString)")
                             
                             // Print additional info for non-textual content
