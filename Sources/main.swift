@@ -339,7 +339,11 @@ func setupRoutes(_ app: Application, _ dbManager: DatabaseManager) throws {
             startDate: startDate,
             endDate: endDate
         )
-        return HistoryResponse(entries: entries.map(ClipboardEntryResponse.init), total: entries.count)
+        
+        // Get total count separately to ensure accurate count even with limit
+        let totalCount = try dbManager.getEntryCount()
+        
+        return HistoryResponse(entries: entries.map(ClipboardEntryResponse.init), total: totalCount)
     }
     
     // GET /search?type=url&query=example&range=1h
