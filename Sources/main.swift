@@ -86,9 +86,6 @@ class DatabaseManager: @unchecked Sendable {
         self.dbQueue = try DatabaseQueue(path: path)
         self.maxEntries = maxEntries
         
-        // Check and perform migration if needed
-        try migrateToUUID(db: dbQueue)
-        
         // Initialize database schema
         try dbQueue.write { db in
             try db.create(table: "clipboard_entries", ifNotExists: true) { t in
@@ -110,68 +107,6 @@ class DatabaseManager: @unchecked Sendable {
                     GROUP BY content
                 )
                 """)
-        }
-    }
-    
-    private func migrateToUUID(db: DatabaseQueue) throws {
-        try db.write { db in
-            // Check if we need migration by looking at table structure
-            let columns = try db.columns(in: "clipboard_entries")
-            let idColumn = columns.first { $0.name == "id" }
-            
-            if idColumn?.type.lowercased() != "text" {
-                // Create temporary table with new schema
-                try db.execute(sql: """
-                    CREATE TABLE clipboard_entries_new (
-                        id TEXT PRIMARY KEY NOT NULL,
-                        content TEXT NOT NULL,
-                        type TEXT NOT NULL,
-                        timestamp DATETIME NOT NULL,
-                        UNIQUE(content)
-                    )
-                    """)
-                
-                // Copy data with proper UUID conversion
-                try db.execute(sql: """
-                    INSERT INTO clipboard_entries_new (id, content, type, timestamp)
-                    SELECT uuid(), content, type, timestamp
-                    FROM clipboard_entries
-                    """)
-                
-                // Drop old table and rename new one
-                try db.execute(sql: "DROP TABLE clipboard_entries")
-                try db.execute(sql: "ALTER TABLE clipboard_entries_new RENAME TO clipboard_entries")
-            } else {
-                // Check if UUIDs need reformatting
-                let malformedUUIDs = try Int.fetchOne(db, sql: """
-                    SELECT COUNT(*) FROM clipboard_entries 
-                    WHERE id NOT LIKE '%-%'
-                    """) ?? 0
-                
-                if malformedUUIDs > 0 {
-                    // Create temporary table
-                    try db.execute(sql: """
-                        CREATE TABLE clipboard_entries_new (
-                            id TEXT PRIMARY KEY NOT NULL,
-                            content TEXT NOT NULL,
-                            type TEXT NOT NULL,
-                            timestamp DATETIME NOT NULL,
-                            UNIQUE(content)
-                        )
-                        """)
-                    
-                    // Copy data with UUID reformatting
-                    try db.execute(sql: """
-                        INSERT INTO clipboard_entries_new (id, content, type, timestamp)
-                        SELECT uuid(), content, type, timestamp
-                        FROM clipboard_entries
-                        """)
-                    
-                    // Drop old table and rename new one
-                    try db.execute(sql: "DROP TABLE clipboard_entries")
-                    try db.execute(sql: "ALTER TABLE clipboard_entries_new RENAME TO clipboard_entries")
-                }
-            }
         }
     }
     
