@@ -539,12 +539,34 @@ struct Kopya {
         let app = try await Application.make(.detect())
         try setupRoutes(app, dbManager)
         
+        // Set up signal handling for graceful shutdown
+        setupSignalHandling()
+        
         // Start clipboard monitoring in a background task
-        Task.detached {
+        let monitorTask = Task {
             try await app.execute()
         }
         
         // Start monitoring clipboard in the main thread
-        try ClipboardMonitor(maxEntries: maxEntries).startMonitoring()
+        do {
+            try ClipboardMonitor(maxEntries: maxEntries).startMonitoring()
+        } catch {
+            print("Error in clipboard monitoring: \(error)")
+            monitorTask.cancel()
+            exit(1)
+        }
+    }
+    
+    static func setupSignalHandling() {
+        // Handle termination signals
+        signal(SIGINT) { _ in
+            print("\nReceived termination signal (SIGINT). Shutting down...")
+            exit(0)
+        }
+        
+        signal(SIGTERM) { _ in
+            print("\nReceived termination signal (SIGTERM). Shutting down...")
+            exit(0)
+        }
     }
 }
