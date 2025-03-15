@@ -5,6 +5,8 @@ import Vapor
 import ArgumentParser
 import Dispatch
 
+let Version = "0.0.1"
+
 // MARK: - API Models
 struct HistoryResponse: Content {
     let entries: [ClipboardEntryResponse]
@@ -533,7 +535,7 @@ class ClipboardMonitor {
 struct Kopya: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
         abstract: "A clipboard manager for macOS",
-        version: "1.0.0"
+        version: Version
     )
     
     @ArgumentParser.Option(name: .shortAndLong, help: "Port to run the server on")

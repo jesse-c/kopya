@@ -8,14 +8,19 @@ on:
 
 jobs:
   build-test:
+    name: Build and Test
     runs-on: macos-latest
+
     steps:
     - uses: actions/checkout@v4
-    - name: Setup Swift
+
+    - name: Set-up Swift
       uses: swift-actions/setup-swift@v2
       with:
         swift-version: "6.0"
+
     - name: Build
       run: swift build -v
-    - name: Run tests
+
+    - name: Test
       run: swift test -v
