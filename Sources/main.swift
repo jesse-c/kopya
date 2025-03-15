@@ -2,6 +2,8 @@ import Foundation
 import AppKit
 import GRDB
 import Vapor
+import ArgumentParser
+import Dispatch
 
 // MARK: - API Models
 struct HistoryResponse: Content {
@@ -528,19 +530,53 @@ class ClipboardMonitor {
 
 // MARK: - Main
 @main
-struct Kopya {
-    static func main() async throws {
+struct Kopya: AsyncParsableCommand {
+    static let configuration = CommandConfiguration(
+        abstract: "A clipboard manager for macOS",
+        version: "1.0.0"
+    )
+    
+    @ArgumentParser.Option(name: .shortAndLong, help: "Port to run the server on")
+    var port: Int = 8080
+    
+    @ArgumentParser.Option(name: .shortAndLong, help: "Maximum number of clipboard entries to store")
+    var maxEntries: Int = 1000
+    
+    mutating func run() async throws {
         print("Starting Kopya clipboard manager...")
         
-        let maxEntries = 1000
+        // Create a signal source for handling interrupts
+        let sigintSource = DispatchSource.makeSignalSource(signal: SIGINT, queue: .main)
+        sigintSource.setEventHandler {
+            print("\nReceived termination signal (SIGINT). Shutting down...")
+            Foundation.exit(0)
+        }
+        sigintSource.resume()
+        
+        // Create a signal source for handling termination
+        let sigtermSource = DispatchSource.makeSignalSource(signal: SIGTERM, queue: .main)
+        sigtermSource.setEventHandler {
+            print("\nReceived termination signal (SIGTERM). Shutting down...")
+            Foundation.exit(0)
+        }
+        sigtermSource.resume()
+        
+        // Ignore the signals at the process level so the dispatch sources can handle them
+        signal(SIGINT, SIG_IGN)
+        signal(SIGTERM, SIG_IGN)
+        
         let dbManager = try DatabaseManager(maxEntries: maxEntries)
         
         // Configure and start Vapor server
-        let app = try await Application.make(.detect())
-        try setupRoutes(app, dbManager)
+        var env = try Environment.detect()
+        env.commandInput.arguments = []
         
-        // Set up signal handling for graceful shutdown
-        setupSignalHandling()
+        let app = try await Application.make(env)
+        
+        // Set the port in the application configuration
+        app.http.server.configuration.port = port
+        
+        try setupRoutes(app, dbManager)
         
         // Start clipboard monitoring in a background task
         let monitorTask = Task {
@@ -553,20 +589,7 @@ struct Kopya {
         } catch {
             print("Error in clipboard monitoring: \(error)")
             monitorTask.cancel()
-            exit(1)
-        }
-    }
-    
-    static func setupSignalHandling() {
-        // Handle termination signals
-        signal(SIGINT) { _ in
-            print("\nReceived termination signal (SIGINT). Shutting down...")
-            exit(0)
-        }
-        
-        signal(SIGTERM) { _ in
-            print("\nReceived termination signal (SIGTERM). Shutting down...")
-            exit(0)
+            Foundation.exit(1)
         }
     }
 }
