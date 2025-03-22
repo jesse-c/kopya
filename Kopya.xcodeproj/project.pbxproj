@@ -1,0 +1,546 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXContainerItemProxy section */
+		889A41272D8ED91700C8EE31 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 889A410D2D8ED91600C8EE31 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 889A41142D8ED91600C8EE31;
+			remoteInfo = Kopya;
+		};
+		889A41312D8ED91700C8EE31 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 889A410D2D8ED91600C8EE31 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 889A41142D8ED91600C8EE31;
+			remoteInfo = Kopya;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXFileReference section */
+		889A41152D8ED91600C8EE31 /* Kopya.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Kopya.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		889A41262D8ED91700C8EE31 /* KopyaTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = KopyaTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		889A41302D8ED91700C8EE31 /* KopyaUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = KopyaUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+/* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedRootGroup section */
+		889A41172D8ED91600C8EE31 /* Kopya */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = Kopya;
+			sourceTree = "<group>";
+		};
+		889A41292D8ED91700C8EE31 /* KopyaTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = KopyaTests;
+			sourceTree = "<group>";
+		};
+		889A41332D8ED91700C8EE31 /* KopyaUITests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = KopyaUITests;
+			sourceTree = "<group>";
+		};
+/* End PBXFileSystemSynchronizedRootGroup section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		889A41122D8ED91600C8EE31 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		889A41232D8ED91700C8EE31 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		889A412D2D8ED91700C8EE31 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		889A410C2D8ED91600C8EE31 = {
+			isa = PBXGroup;
+			children = (
+				889A41172D8ED91600C8EE31 /* Kopya */,
+				889A41292D8ED91700C8EE31 /* KopyaTests */,
+				889A41332D8ED91700C8EE31 /* KopyaUITests */,
+				889A41162D8ED91600C8EE31 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		889A41162D8ED91600C8EE31 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				889A41152D8ED91600C8EE31 /* Kopya.app */,
+				889A41262D8ED91700C8EE31 /* KopyaTests.xctest */,
+				889A41302D8ED91700C8EE31 /* KopyaUITests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		889A41142D8ED91600C8EE31 /* Kopya */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 889A413A2D8ED91700C8EE31 /* Build configuration list for PBXNativeTarget "Kopya" */;
+			buildPhases = (
+				889A41112D8ED91600C8EE31 /* Sources */,
+				889A41122D8ED91600C8EE31 /* Frameworks */,
+				889A41132D8ED91600C8EE31 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				889A41172D8ED91600C8EE31 /* Kopya */,
+			);
+			name = Kopya;
+			packageProductDependencies = (
+			);
+			productName = Kopya;
+			productReference = 889A41152D8ED91600C8EE31 /* Kopya.app */;
+			productType = "com.apple.product-type.application";
+		};
+		889A41252D8ED91700C8EE31 /* KopyaTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 889A413D2D8ED91700C8EE31 /* Build configuration list for PBXNativeTarget "KopyaTests" */;
+			buildPhases = (
+				889A41222D8ED91700C8EE31 /* Sources */,
+				889A41232D8ED91700C8EE31 /* Frameworks */,
+				889A41242D8ED91700C8EE31 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				889A41282D8ED91700C8EE31 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				889A41292D8ED91700C8EE31 /* KopyaTests */,
+			);
+			name = KopyaTests;
+			packageProductDependencies = (
+			);
+			productName = KopyaTests;
+			productReference = 889A41262D8ED91700C8EE31 /* KopyaTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		889A412F2D8ED91700C8EE31 /* KopyaUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 889A41402D8ED91700C8EE31 /* Build configuration list for PBXNativeTarget "KopyaUITests" */;
+			buildPhases = (
+				889A412C2D8ED91700C8EE31 /* Sources */,
+				889A412D2D8ED91700C8EE31 /* Frameworks */,
+				889A412E2D8ED91700C8EE31 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				889A41322D8ED91700C8EE31 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				889A41332D8ED91700C8EE31 /* KopyaUITests */,
+			);
+			name = KopyaUITests;
+			packageProductDependencies = (
+			);
+			productName = KopyaUITests;
+			productReference = 889A41302D8ED91700C8EE31 /* KopyaUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		889A410D2D8ED91600C8EE31 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 1620;
+				LastUpgradeCheck = 1620;
+				TargetAttributes = {
+					889A41142D8ED91600C8EE31 = {
+						CreatedOnToolsVersion = 16.2;
+					};
+					889A41252D8ED91700C8EE31 = {
+						CreatedOnToolsVersion = 16.2;
+						TestTargetID = 889A41142D8ED91600C8EE31;
+					};
+					889A412F2D8ED91700C8EE31 = {
+						CreatedOnToolsVersion = 16.2;
+						TestTargetID = 889A41142D8ED91600C8EE31;
+					};
+				};
+			};
+			buildConfigurationList = 889A41102D8ED91600C8EE31 /* Build configuration list for PBXProject "Kopya" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = 889A410C2D8ED91600C8EE31;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 889A41162D8ED91600C8EE31 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				889A41142D8ED91600C8EE31 /* Kopya */,
+				889A41252D8ED91700C8EE31 /* KopyaTests */,
+				889A412F2D8ED91700C8EE31 /* KopyaUITests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		889A41132D8ED91600C8EE31 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		889A41242D8ED91700C8EE31 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		889A412E2D8ED91700C8EE31 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		889A41112D8ED91600C8EE31 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		889A41222D8ED91700C8EE31 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		889A412C2D8ED91700C8EE31 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		889A41282D8ED91700C8EE31 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 889A41142D8ED91600C8EE31 /* Kopya */;
+			targetProxy = 889A41272D8ED91700C8EE31 /* PBXContainerItemProxy */;
+		};
+		889A41322D8ED91700C8EE31 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 889A41142D8ED91600C8EE31 /* Kopya */;
+			targetProxy = 889A41312D8ED91700C8EE31 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		889A41382D8ED91700C8EE31 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MACOSX_DEPLOYMENT_TARGET = 15.2;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		889A41392D8ED91700C8EE31 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MACOSX_DEPLOYMENT_TARGET = 15.2;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				SDKROOT = macosx;
+				SWIFT_COMPILATION_MODE = wholemodule;
+			};
+			name = Release;
+		};
+		889A413B2D8ED91700C8EE31 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = Kopya/Kopya.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_ASSET_PATHS = "\"Kopya/Preview Content\"";
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MARKETING_VERSION = 0.1;
+				PRODUCT_BUNDLE_IDENTIFIER = com.jesseclaven.Kopya;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		889A413C2D8ED91700C8EE31 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = Kopya/Kopya.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_ASSET_PATHS = "\"Kopya/Preview Content\"";
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MARKETING_VERSION = 0.1;
+				PRODUCT_BUNDLE_IDENTIFIER = com.jesseclaven.Kopya;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		889A413E2D8ED91700C8EE31 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 15.2;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.jesseclaven.KopyaTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Kopya.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Kopya";
+			};
+			name = Debug;
+		};
+		889A413F2D8ED91700C8EE31 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 15.2;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.jesseclaven.KopyaTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Kopya.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Kopya";
+			};
+			name = Release;
+		};
+		889A41412D8ED91700C8EE31 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.jesseclaven.KopyaUITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TEST_TARGET_NAME = Kopya;
+			};
+			name = Debug;
+		};
+		889A41422D8ED91700C8EE31 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.jesseclaven.KopyaUITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TEST_TARGET_NAME = Kopya;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		889A41102D8ED91600C8EE31 /* Build configuration list for PBXProject "Kopya" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				889A41382D8ED91700C8EE31 /* Debug */,
+				889A41392D8ED91700C8EE31 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		889A413A2D8ED91700C8EE31 /* Build configuration list for PBXNativeTarget "Kopya" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				889A413B2D8ED91700C8EE31 /* Debug */,
+				889A413C2D8ED91700C8EE31 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		889A413D2D8ED91700C8EE31 /* Build configuration list for PBXNativeTarget "KopyaTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				889A413E2D8ED91700C8EE31 /* Debug */,
+				889A413F2D8ED91700C8EE31 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		889A41402D8ED91700C8EE31 /* Build configuration list for PBXNativeTarget "KopyaUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				889A41412D8ED91700C8EE31 /* Debug */,
+				889A41422D8ED91700C8EE31 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 889A410D2D8ED91600C8EE31 /* Project object */;
+}

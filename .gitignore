@@ -30,6 +30,7 @@ Packages/
 .swiftpm
 
 .build/
+build/
 
 # CocoaPods
 #
