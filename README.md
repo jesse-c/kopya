@@ -2,6 +2,7 @@
 
 <!--toc:start-->
 - [Intro](#intro)
+- [Config](#config)
 - [Usage](#usage)
 <!--toc:end-->
 
@@ -19,6 +20,16 @@ This is a headless/daemon-only clipboard manager[^1]. By itself, it's not useful
 It exposes a REST API over HTTP. You can list, search, and delete entries.
 
 You can read my introductory blog post[^2]. The WIP (as of 2025-03-15) version of the Raycast extension is available too[^3].
+
+## Config
+
+There must be a config file at `$USER/.config/kopya/config.toml`, with contents like the following:
+
+```toml
+run-at-login = true
+max-entries = 10000000
+port = 9090
+```
 
 ## Usage
 
