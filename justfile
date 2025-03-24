@@ -7,7 +7,7 @@ default:
 
 # Run the application
 run *ARGS:
-    ./.build/debug/Kopya {{ARGS}}
+    ./.build/debug/kopya {{ARGS}}
 
 # Generate version information from git tag or commit SHA
 version:
@@ -36,13 +36,13 @@ version:
     echo "    static let version = \"$VERSION\"" >> Sources/Version.swift
     echo "}" >> Sources/Version.swift
 
-# Build the application
-build: version
-    swift build -Xswiftc -parse-as-library
+# Build in debug mode
+debug:
+    swift build -Xswiftc -parse-as-library --product kopya
 
 # Build in release mode
-release: version
-    swift build -c release -Xswiftc -parse-as-library
+release:
+    swift build -c release -Xswiftc -parse-as-library --product kopya
 
 # Run tests
 test:
@@ -54,7 +54,7 @@ clean:
     rm -rf .build
 
 # Install the application
-install: release
+install:
     mkdir -p {{local_bin_path}}
-    cp ./.build/release/Kopya {{local_bin_path}}/kopya
+    cp ./.build/release/kopya {{local_bin_path}}/kopya
     echo "Installed Kopya to {{local_bin_path}}/kopya"

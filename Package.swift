@@ -8,6 +8,9 @@ let package = Package(
     platforms: [
         .macOS(.v13)
     ],
+    products: [
+        .executable(name: "kopya", targets: ["Kopya"])
+    ],
     dependencies: [
         .package(url: "https://github.com/groue/GRDB.swift.git", from: "6.21.0"),
         .package(url: "https://github.com/vapor/vapor.git", from: "4.89.0"),

@@ -25,7 +25,7 @@ jobs:
         run: |
           swift build -c release
           mkdir artifacts
-          cp .build/release/Kopya artifacts/kopya
+          cp .build/release/kopya artifacts/kopya
 
       - name: Extract version from tag
         id: get_version
