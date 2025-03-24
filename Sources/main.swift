@@ -7,8 +7,6 @@ import ServiceManagement
 import TOMLKit
 import Logging
 
-let Version = "0.0.2"
-
 let logger = Logger(label: "com.jesse-c.kopya")
 
 // MARK: - API Models
@@ -621,7 +619,7 @@ class ClipboardMonitor {
 struct Kopya: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
         abstract: "A clipboard manager for macOS",
-        version: Version
+        version: Version.version
     )
 
     @ArgumentParser.Option(name: [.customShort("p"), .long], help: "Port to run the server on (overrides config value)")
