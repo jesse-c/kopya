@@ -46,7 +46,7 @@ release:
 
 # Run tests
 test:
-    swift test
+    swift test -v -Xswiftc -parse-as-library
 
 # Clean build artifacts
 clean:

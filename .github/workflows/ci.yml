@@ -12,15 +12,21 @@ jobs:
     runs-on: macos-latest
 
     steps:
-    - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-    - name: Set-up Swift
-      uses: swift-actions/setup-swift@v2
-      with:
-        swift-version: "6.0"
+      - name: Set-up Swift
+        uses: swift-actions/setup-swift@v2
+        with:
+          swift-version: "6.0"
 
-    - name: Build
-      run: swift build -v
+      - name: Set-up Just
+        uses: extractions/setup-just@v3
 
-    - name: Test
-      run: swift test -v
+      - name: Version
+        run: just version
+
+      - name: Build
+        run: just debug
+
+      - name: Test
+        run: just test
