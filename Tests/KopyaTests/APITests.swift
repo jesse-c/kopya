@@ -159,6 +159,205 @@ final class APITests: XCTestCase {
         }
     }
     
+    func testDeleteEntriesByDateRangeEndpoint() throws {
+        // Create test database
+        (dbManager, dbPath) = try createTestDatabase()
+        try setupRoutes(app, dbManager)
+        
+        let now = Date()
+        let calendar = Calendar.current
+        
+        // Add entries with different timestamps
+        let entries = [
+            ("Very old entry", calendar.date(byAdding: .hour, value: -5, to: now)!),
+            ("Old entry", calendar.date(byAdding: .hour, value: -4, to: now)!),
+            ("Medium old entry", calendar.date(byAdding: .hour, value: -3, to: now)!),
+            ("Recent entry", calendar.date(byAdding: .hour, value: -1, to: now)!),
+            ("Very recent entry", calendar.date(byAdding: .minute, value: -5, to: now)!)
+        ]
+        
+        for (content, timestamp) in entries {
+            let entry = ClipboardEntry(
+                id: nil,
+                content: content,
+                type: "public.utf8-plain-text",
+                timestamp: timestamp
+            )
+            _ = try dbManager.saveEntry(entry)
+        }
+        
+        // Format dates for API request
+        let formatter = ISO8601DateFormatter()
+        let fiveHoursAgo = calendar.date(byAdding: .hour, value: -5, to: now)!
+        let twoHoursAgo = calendar.date(byAdding: .hour, value: -2, to: now)!
+        
+        // Test delete with date range (start and end dates)
+        let startDateStr = formatter.string(from: fiveHoursAgo)
+        let endDateStr = formatter.string(from: twoHoursAgo)
+        
+        try app.test(.DELETE, "history?start=\(startDateStr)&end=\(endDateStr)") { res in
+            XCTAssertEqual(res.status, .ok)
+            
+            let response = try res.content.decode([String: Int].self)
+            XCTAssertEqual(response["deletedCount"], 3, "Should have deleted 3 entries in the date range")
+            XCTAssertEqual(response["remainingCount"], 2, "Should have 2 entries remaining")
+            
+            // Verify the remaining entries
+            let remainingEntries = try dbManager.getRecentEntries()
+            XCTAssertEqual(remainingEntries.count, 2)
+            
+            // The entries outside the date range should still be there
+            XCTAssertTrue(remainingEntries.contains { $0.content == "Recent entry" })
+            XCTAssertTrue(remainingEntries.contains { $0.content == "Very recent entry" })
+        }
+    }
+    
+    func testDeleteEntriesByTimeRangeEndpoint() throws {
+        // Create test database
+        (dbManager, dbPath) = try createTestDatabase()
+        try setupRoutes(app, dbManager)
+        
+        let now = Date()
+        let calendar = Calendar.current
+        
+        // Add entries with different timestamps
+        let entries = [
+            ("Very old entry", calendar.date(byAdding: .hour, value: -5, to: now)!),
+            ("Old entry", calendar.date(byAdding: .hour, value: -4, to: now)!),
+            ("Medium old entry", calendar.date(byAdding: .hour, value: -3, to: now)!),
+            ("Recent entry", calendar.date(byAdding: .hour, value: -1, to: now)!),
+            ("Very recent entry", calendar.date(byAdding: .minute, value: -5, to: now)!)
+        ]
+        
+        for (content, timestamp) in entries {
+            let entry = ClipboardEntry(
+                id: nil,
+                content: content,
+                type: "public.utf8-plain-text",
+                timestamp: timestamp
+            )
+            _ = try dbManager.saveEntry(entry)
+        }
+        
+        // Test delete with time range (last 2 hours)
+        try app.test(.DELETE, "history?range=2h") { res in
+            XCTAssertEqual(res.status, .ok)
+            
+            let response = try res.content.decode([String: Int].self)
+            XCTAssertEqual(response["deletedCount"], 2, "Should have deleted 2 entries from the last 2 hours")
+            XCTAssertEqual(response["remainingCount"], 3, "Should have 3 entries remaining")
+            
+            // Verify the remaining entries
+            let remainingEntries = try dbManager.getRecentEntries()
+            XCTAssertEqual(remainingEntries.count, 3)
+            
+            // The entries older than 2 hours should still be there
+            XCTAssertTrue(remainingEntries.contains { $0.content == "Very old entry" })
+            XCTAssertTrue(remainingEntries.contains { $0.content == "Old entry" })
+            XCTAssertTrue(remainingEntries.contains { $0.content == "Medium old entry" })
+        }
+    }
+    
+    func testDeleteEntriesWithStartDateOnlyEndpoint() throws {
+        // Create test database
+        (dbManager, dbPath) = try createTestDatabase()
+        try setupRoutes(app, dbManager)
+        
+        let now = Date()
+        let calendar = Calendar.current
+        
+        // Add entries with different timestamps
+        let entries = [
+            ("Very old entry", calendar.date(byAdding: .hour, value: -5, to: now)!),
+            ("Old entry", calendar.date(byAdding: .hour, value: -4, to: now)!),
+            ("Medium old entry", calendar.date(byAdding: .hour, value: -3, to: now)!),
+            ("Recent entry", calendar.date(byAdding: .hour, value: -1, to: now)!),
+            ("Very recent entry", calendar.date(byAdding: .minute, value: -5, to: now)!)
+        ]
+        
+        for (content, timestamp) in entries {
+            let entry = ClipboardEntry(
+                id: nil,
+                content: content,
+                type: "public.utf8-plain-text",
+                timestamp: timestamp
+            )
+            _ = try dbManager.saveEntry(entry)
+        }
+        
+        // Format date for API request
+        let formatter = ISO8601DateFormatter()
+        let threeHoursAgo = calendar.date(byAdding: .hour, value: -3, to: now)!
+        let startDateStr = formatter.string(from: threeHoursAgo)
+        
+        // Test delete with start date only (should delete entries from 3 hours ago until now)
+        try app.test(.DELETE, "history?start=\(startDateStr)") { res in
+            XCTAssertEqual(res.status, .ok)
+            
+            let response = try res.content.decode([String: Int].self)
+            XCTAssertEqual(response["deletedCount"], 3, "Should have deleted 3 entries from 3 hours ago until now")
+            XCTAssertEqual(response["remainingCount"], 2, "Should have 2 entries remaining")
+            
+            // Verify the remaining entries
+            let remainingEntries = try dbManager.getRecentEntries()
+            XCTAssertEqual(remainingEntries.count, 2)
+            
+            // The entries older than 3 hours should still be there
+            XCTAssertTrue(remainingEntries.contains { $0.content == "Very old entry" })
+            XCTAssertTrue(remainingEntries.contains { $0.content == "Old entry" })
+        }
+    }
+    
+    func testDeleteEntriesWithDateRangeAndLimitEndpoint() throws {
+        // Create test database
+        (dbManager, dbPath) = try createTestDatabase()
+        try setupRoutes(app, dbManager)
+        
+        let now = Date()
+        let calendar = Calendar.current
+        
+        // Add entries with different timestamps
+        let entries = [
+            ("Very old entry", calendar.date(byAdding: .hour, value: -5, to: now)!),
+            ("Old entry", calendar.date(byAdding: .hour, value: -4, to: now)!),
+            ("Medium old entry", calendar.date(byAdding: .hour, value: -3, to: now)!),
+            ("Recent entry", calendar.date(byAdding: .hour, value: -1, to: now)!),
+            ("Very recent entry", calendar.date(byAdding: .minute, value: -5, to: now)!)
+        ]
+        
+        for (content, timestamp) in entries {
+            let entry = ClipboardEntry(
+                id: nil,
+                content: content,
+                type: "public.utf8-plain-text",
+                timestamp: timestamp
+            )
+            _ = try dbManager.saveEntry(entry)
+        }
+        
+        // Format dates for API request
+        let formatter = ISO8601DateFormatter()
+        let fiveHoursAgo = calendar.date(byAdding: .hour, value: -5, to: now)!
+        let oneHourAgo = calendar.date(byAdding: .hour, value: -1, to: now)!
+        
+        let startDateStr = formatter.string(from: fiveHoursAgo)
+        let endDateStr = formatter.string(from: oneHourAgo)
+        
+        // Test delete with date range and limit (should delete only 2 entries from the range)
+        try app.test(.DELETE, "history?start=\(startDateStr)&end=\(endDateStr)&limit=2") { res in
+            XCTAssertEqual(res.status, .ok)
+            
+            let response = try res.content.decode([String: Int].self)
+            XCTAssertEqual(response["deletedCount"], 2, "Should have deleted 2 entries with the limit")
+            XCTAssertEqual(response["remainingCount"], 3, "Should have 3 entries remaining")
+            
+            // We can't be sure which 2 of the 4 entries in the date range were deleted due to the limit,
+            // so we just check the total count
+            let remainingEntries = try dbManager.getRecentEntries()
+            XCTAssertEqual(remainingEntries.count, 3)
+        }
+    }
+    
     func testDeleteEntryByIdEndpoint() throws {
         // Create test database
         (dbManager, dbPath) = try createTestDatabase()

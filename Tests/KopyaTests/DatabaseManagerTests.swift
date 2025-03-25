@@ -301,53 +301,58 @@ final class DatabaseManagerTests: XCTestCase {
     }
     
     func testDeleteEntryById() throws {
-        // Create several entries
-        let entries = [
-            ("Entry 1", "public.utf8-plain-text"),
-            ("Entry 2", "public.url"),
-            ("Entry 3", "public.utf8-plain-text")
-        ]
+        // Create entries with unique content to ensure we can identify them
+        let entry1 = ClipboardEntry(
+            id: nil,
+            content: "Unique Entry 1 for deletion test",
+            type: "public.utf8-plain-text",
+            timestamp: Date()
+        )
         
-        var savedIds: [UUID] = []
+        let entry2 = ClipboardEntry(
+            id: nil,
+            content: "Unique Entry 2 for deletion test",
+            type: "public.url",
+            timestamp: Date()
+        )
         
-        for (content, type) in entries {
-            let entry = ClipboardEntry(
-                id: nil,
-                content: content,
-                type: type,
-                timestamp: Date()
-            )
-            _ = try dbManager.saveEntry(entry)
-            
-            // Get the most recent entry to capture its ID
-            let recentEntries = try dbManager.getRecentEntries(limit: 1)
-            if let savedEntry = recentEntries.first, let id = savedEntry.id {
-                savedIds.append(id)
-                XCTAssertEqual(savedEntry.content, content)
-            } else {
-                XCTFail("Failed to retrieve saved entry")
-            }
-        }
+        let entry3 = ClipboardEntry(
+            id: nil,
+            content: "Unique Entry 3 for deletion test",
+            type: "public.utf8-plain-text",
+            timestamp: Date()
+        )
         
-        // Verify we have 3 entries
-        var allEntries = try dbManager.getRecentEntries()
+        // Save entries and get their IDs
+        _ = try dbManager.saveEntry(entry1)
+        _ = try dbManager.saveEntry(entry2)
+        _ = try dbManager.saveEntry(entry3)
+        
+        // Get all entries
+        let allEntries = try dbManager.getRecentEntries()
         XCTAssertEqual(allEntries.count, 3)
         
-        // Delete the middle entry by ID
-        let idToDelete = savedIds[1]
+        // Find entry2 by its unique content
+        guard let entryToDelete = allEntries.first(where: { $0.content == "Unique Entry 2 for deletion test" }),
+              let idToDelete = entryToDelete.id else {
+            XCTFail("Could not find entry to delete or it has no ID")
+            return
+        }
+        
+        // Delete the entry
         let deleteResult = try dbManager.deleteEntryById(idToDelete)
         XCTAssertTrue(deleteResult, "Deletion should return true for existing entry")
         
         // Verify we now have 2 entries
-        allEntries = try dbManager.getRecentEntries()
-        XCTAssertEqual(allEntries.count, 2)
+        let remainingEntries = try dbManager.getRecentEntries()
+        XCTAssertEqual(remainingEntries.count, 2)
         
         // Verify the deleted entry is gone
-        XCTAssertFalse(allEntries.contains { $0.id == idToDelete })
+        XCTAssertFalse(remainingEntries.contains { $0.content == "Unique Entry 2 for deletion test" })
         
         // Verify the other entries remain
-        XCTAssertTrue(allEntries.contains { $0.id == savedIds[0] })
-        XCTAssertTrue(allEntries.contains { $0.id == savedIds[2] })
+        XCTAssertTrue(remainingEntries.contains { $0.content == "Unique Entry 1 for deletion test" })
+        XCTAssertTrue(remainingEntries.contains { $0.content == "Unique Entry 3 for deletion test" })
         
         // Try to delete an entry with a non-existent ID
         let nonExistentId = UUID()
@@ -355,7 +360,7 @@ final class DatabaseManagerTests: XCTestCase {
         XCTAssertFalse(deleteNonExistentResult, "Deletion should return false for non-existent entry")
         
         // Verify we still have 2 entries
-        allEntries = try dbManager.getRecentEntries()
-        XCTAssertEqual(allEntries.count, 2)
+        let finalEntries = try dbManager.getRecentEntries()
+        XCTAssertEqual(finalEntries.count, 2)
     }
 }
