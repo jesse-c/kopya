@@ -11,7 +11,7 @@ final class DatabaseManagerTests: XCTestCase {
         // Create a temporary database for testing
         let tempDir = FileManager.default.temporaryDirectory
         dbPath = tempDir.appendingPathComponent("kopya_test_\(UUID().uuidString).db").path
-        dbManager = try DatabaseManager(databasePath: dbPath, maxEntries: testMaxEntries)
+        dbManager = try DatabaseManager(databasePath: dbPath, maxEntries: testMaxEntries, backupEnabled: false)
     }
     
     override func tearDown() async throws {

@@ -107,19 +107,24 @@ struct ClipboardEntry: Codable, FetchableRecord, PersistableRecord {
 class DatabaseManager: @unchecked Sendable {
     private let dbQueue: DatabaseQueue
     private let maxEntries: Int
-
-    init(databasePath: String? = nil, maxEntries: Int = 1000) throws {
+    private let databasePath: String
+    private var backupTimer: Timer?
+    private let backupEnabled: Bool
+    
+    init(databasePath: String? = nil, maxEntries: Int = 1000, backupEnabled: Bool = false) throws {
         let path = databasePath ?? "\(NSHomeDirectory())/Library/Application Support/Kopya/history.db"
-
+        self.databasePath = path
+        self.backupEnabled = backupEnabled
+        
         // Ensure directory exists
         try FileManager.default.createDirectory(
             atPath: (path as NSString).deletingLastPathComponent,
             withIntermediateDirectories: true
         )
-
+        
         self.dbQueue = try DatabaseQueue(path: path)
         self.maxEntries = maxEntries
-
+        
         // Initialize database schema
         try dbQueue.write { db in
             try db.create(table: "clipboard_entries", ifNotExists: true) { t in
@@ -130,7 +135,7 @@ class DatabaseManager: @unchecked Sendable {
                 t.uniqueKey(["content"])  // Ensure content is unique
             }
         }
-
+        
         // Clean up duplicate entries on startup
         try dbQueue.write { db in
             try db.execute(sql: """
@@ -141,6 +146,76 @@ class DatabaseManager: @unchecked Sendable {
                     GROUP BY content
                 )
                 """)
+        }
+        
+        // Setup backup timer if enabled
+        if backupEnabled {
+            setupBackupTimer()
+        }
+    }
+    
+    deinit {
+        backupTimer?.invalidate()
+    }
+    
+    private func setupBackupTimer() {
+        // Schedule hourly backups
+        backupTimer = Timer.scheduledTimer(withTimeInterval: 3600, repeats: true) { [weak self] _ in
+            self?.performBackup()
+        }
+        
+        // Run an initial backup
+        performBackup()
+    }
+    
+    private func performBackup() {
+        do {
+            let backupDir = (databasePath as NSString).deletingLastPathComponent + "/backups"
+            
+            // Ensure backup directory exists
+            try FileManager.default.createDirectory(
+                atPath: backupDir,
+                withIntermediateDirectories: true
+            )
+            
+            // Create a timestamp for the backup file
+            let dateFormatter = DateFormatter()
+            dateFormatter.dateFormat = "yyyy-MM-dd_HH-mm-ss"
+            let timestamp = dateFormatter.string(from: Date())
+            
+            // Create backup file path
+            let backupFilename = (databasePath as NSString).lastPathComponent
+            let backupPath = "\(backupDir)/\(backupFilename)_\(timestamp).bak"
+            
+            // Copy the database file
+            try dbQueue.backup(to: DatabaseQueue(path: backupPath))
+            
+            logger.info("Database backup created at \(backupPath)")
+            
+            // Clean up old backups (keep last 72 backups = 3 days worth)
+            cleanupOldBackups(backupDir: backupDir, maxBackups: 72)
+        } catch {
+            logger.error("Failed to create database backup: \(error.localizedDescription)")
+        }
+    }
+    
+    private func cleanupOldBackups(backupDir: String, maxBackups: Int) {
+        do {
+            let fileManager = FileManager.default
+            let backupFiles = try fileManager.contentsOfDirectory(atPath: backupDir)
+                .filter { $0.hasSuffix(".bak") }
+                .sorted()
+            
+            if backupFiles.count > maxBackups {
+                // Delete oldest backups
+                for i in 0..<(backupFiles.count - maxBackups) {
+                    let fileToDelete = "\(backupDir)/\(backupFiles[i])"
+                    try fileManager.removeItem(atPath: fileToDelete)
+                    logger.info("Deleted old backup: \(fileToDelete)")
+                }
+            }
+        } catch {
+            logger.error("Failed to clean up old backups: \(error.localizedDescription)")
         }
     }
 
@@ -353,6 +428,7 @@ struct KopyaConfig: Codable {
     var runAtLogin: Bool
     var maxEntries: Int
     var port: Int
+    var backup: Bool
 }
 
 class ConfigManager {
@@ -413,6 +489,14 @@ class ConfigManager {
             } else {
                 Self.logger.error("Missing 'port' in config")
                 throw NSError(domain: "ConfigManager", code: 5, userInfo: [NSLocalizedDescriptionKey: "Missing 'port' in config"])
+            }
+
+            // Extract and validate backup
+            if let backupValue = toml["backup"] {
+                configTable["backup"] = backupValue
+            } else {
+                Self.logger.error("Missing 'backup' in config")
+                throw NSError(domain: "ConfigManager", code: 6, userInfo: [NSLocalizedDescriptionKey: "Missing 'backup' in config"])
             }
 
             // Decode the table to our KopyaConfig struct
@@ -575,8 +659,8 @@ class ClipboardMonitor {
         (.tiff, "public.tiff")
     ]
 
-    init(maxEntries: Int = 1000) throws {
-        self.dbManager = try DatabaseManager(maxEntries: maxEntries)
+    init(maxEntries: Int = 1000, backupEnabled: Bool = false) throws {
+        self.dbManager = try DatabaseManager(maxEntries: maxEntries, backupEnabled: backupEnabled)
         self.lastChangeCount = NSPasteboard.general.changeCount
 
         // Print initial stats without processing current clipboard content
@@ -742,7 +826,7 @@ struct Kopya: AsyncParsableCommand {
         signal(SIGINT, SIG_IGN)
         signal(SIGTERM, SIG_IGN)
 
-        let dbManager = try DatabaseManager(maxEntries: maxEntries)
+        let dbManager = try DatabaseManager(maxEntries: maxEntries, backupEnabled: configManager.config.backup)
 
         // Configure and start Vapor server
         var env = try Environment.detect()
@@ -762,7 +846,7 @@ struct Kopya: AsyncParsableCommand {
 
         // Start monitoring clipboard in the main thread
         do {
-            try ClipboardMonitor(maxEntries: maxEntries).startMonitoring()
+            try ClipboardMonitor(maxEntries: maxEntries, backupEnabled: configManager.config.backup).startMonitoring()
         } catch {
             logger.error("Error in clipboard monitoring: \(error)")
             monitorTask.cancel()
