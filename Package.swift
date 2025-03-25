@@ -28,13 +28,19 @@ let package = Package(
                 .product(name: "TOMLKit", package: "TOMLKit"),
                 .product(name: "Logging", package: "swift-log")
             ],
-            path: "Sources"
+            path: "Sources",
+            swiftSettings: [
+                .unsafeFlags(["-parse-as-library"], .when(configuration: .debug))
+            ]
         ),
         .testTarget(
             name: "KopyaTests",
             dependencies: [
                 "Kopya",
                 .product(name: "XCTVapor", package: "vapor")
+            ],
+            swiftSettings: [
+                .unsafeFlags(["-parse-as-library"])
             ]
         )
     ]

@@ -158,4 +158,87 @@ final class APITests: XCTestCase {
             XCTAssertEqual(response["remainingCount"], 2)
         }
     }
+    
+    func testDeleteEntryByIdEndpoint() throws {
+        // Create test database
+        (dbManager, dbPath) = try createTestDatabase()
+        try setupRoutes(app, dbManager)
+        
+        // Add test entries with specific content to easily identify them
+        let testEntries = [
+            "Entry to keep 1",
+            "Entry to delete",
+            "Entry to keep 2"
+        ]
+        
+        for content in testEntries {
+            let entry = ClipboardEntry(
+                id: nil,
+                content: content,
+                type: "public.utf8-plain-text",
+                timestamp: Date()
+            )
+            _ = try dbManager.saveEntry(entry)
+        }
+        
+        // Get all entries to find the one we want to delete
+        let entries = try dbManager.getRecentEntries()
+        XCTAssertEqual(entries.count, 3)
+        
+        // Find the entry with the content "Entry to delete"
+        guard let entryToDelete = entries.first(where: { $0.content == "Entry to delete" }),
+              let idToDelete = entryToDelete.id else {
+            XCTFail("Could not find entry to delete or it has no ID")
+            return
+        }
+        
+        // Test the DELETE endpoint with the specific UUID
+        try app.test(.DELETE, "history/\(idToDelete.uuidString)") { res in
+            XCTAssertEqual(res.status, .ok)
+            
+            struct DeleteResponse: Codable {
+                let success: Bool
+                let id: String
+                let message: String
+            }
+            
+            let response = try res.content.decode(DeleteResponse.self)
+            XCTAssertTrue(response.success)
+            XCTAssertEqual(response.id, idToDelete.uuidString)
+            XCTAssertEqual(response.message, "Entry deleted successfully")
+            
+            // Verify the entry is actually deleted from the database
+            let remainingEntries = try dbManager.getRecentEntries()
+            XCTAssertEqual(remainingEntries.count, 2)
+            XCTAssertFalse(remainingEntries.contains { $0.id == idToDelete })
+            XCTAssertTrue(remainingEntries.contains { $0.content == "Entry to keep 1" })
+            XCTAssertTrue(remainingEntries.contains { $0.content == "Entry to keep 2" })
+        }
+        
+        // Test with a non-existent UUID
+        let nonExistentId = UUID()
+        try app.test(.DELETE, "history/\(nonExistentId.uuidString)") { res in
+            XCTAssertEqual(res.status, .notFound)
+            
+            struct DeleteResponse: Codable {
+                let success: Bool
+                let id: String
+                let message: String
+            }
+            
+            let response = try res.content.decode(DeleteResponse.self)
+            XCTAssertFalse(response.success)
+            XCTAssertEqual(response.id, nonExistentId.uuidString)
+            XCTAssertEqual(response.message, "Entry not found")
+            
+            // Verify we still have the same 2 entries
+            let remainingEntries = try dbManager.getRecentEntries()
+            XCTAssertEqual(remainingEntries.count, 2)
+        }
+        
+        // Test with an invalid UUID format
+        try app.test(.DELETE, "history/not-a-valid-uuid") { res in
+            XCTAssertEqual(res.status, .badRequest)
+        }
+    }
 }

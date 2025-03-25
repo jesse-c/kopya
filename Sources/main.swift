@@ -33,6 +33,12 @@ struct ClipboardEntryResponse: Content {
     }
 }
 
+struct DeleteByIdResponse: Content {
+    let success: Bool
+    let id: String
+    let message: String
+}
+
 // MARK: - Clipboard History
 struct ClipboardEntry: Codable, FetchableRecord, PersistableRecord {
     static let databaseTableName = "clipboard_entries"
@@ -421,6 +427,26 @@ class DatabaseManager: @unchecked Sendable {
             try db.execute(sql: "DELETE FROM clipboard_entries")
         }
     }
+    
+    func deleteEntryById(_ id: UUID) throws -> Bool {
+        try dbQueue.write { db in
+            // Check if the entry exists
+            let exists = try ClipboardEntry
+                .filter(Column("id") == id.uuidString)
+                .fetchCount(db) > 0
+            
+            if exists {
+                // Delete the entry
+                try db.execute(
+                    sql: "DELETE FROM clipboard_entries WHERE id = ?",
+                    arguments: [id.uuidString]
+                )
+                return true
+            }
+            
+            return false
+        }
+    }
 }
 
 // MARK: - Configuration Management
@@ -636,6 +662,28 @@ func setupRoutes(_ app: Application, _ dbManager: DatabaseManager) throws {
             "deletedCount": deletedCount,
             "remainingCount": remainingCount
         ])
+        return response
+    }
+    
+    // DELETE /history/:id
+    app.delete("history", ":id") { req -> Response in
+        guard let idString = req.parameters.get("id"),
+              let id = UUID(uuidString: idString) else {
+            throw Abort(.badRequest, reason: "Invalid UUID format")
+        }
+        
+        let success = try dbManager.deleteEntryById(id)
+        let status: HTTPStatus = success ? .ok : .notFound
+        let response = Response(status: status)
+        
+        let responseData = DeleteByIdResponse(
+            success: success,
+            id: idString,
+            message: success ? "Entry deleted successfully" : "Entry not found"
+        )
+        
+        try response.content.encode(responseData)
+        
         return response
     }
 }

@@ -299,4 +299,63 @@ final class DatabaseManagerTests: XCTestCase {
         XCTAssertFalse(remainingEntries.contains { $0.content == "Recent entry" })
         XCTAssertFalse(remainingEntries.contains { $0.content == "Very recent entry" })
     }
+    
+    func testDeleteEntryById() throws {
+        // Create several entries
+        let entries = [
+            ("Entry 1", "public.utf8-plain-text"),
+            ("Entry 2", "public.url"),
+            ("Entry 3", "public.utf8-plain-text")
+        ]
+        
+        var savedIds: [UUID] = []
+        
+        for (content, type) in entries {
+            let entry = ClipboardEntry(
+                id: nil,
+                content: content,
+                type: type,
+                timestamp: Date()
+            )
+            _ = try dbManager.saveEntry(entry)
+            
+            // Get the most recent entry to capture its ID
+            let recentEntries = try dbManager.getRecentEntries(limit: 1)
+            if let savedEntry = recentEntries.first, let id = savedEntry.id {
+                savedIds.append(id)
+                XCTAssertEqual(savedEntry.content, content)
+            } else {
+                XCTFail("Failed to retrieve saved entry")
+            }
+        }
+        
+        // Verify we have 3 entries
+        var allEntries = try dbManager.getRecentEntries()
+        XCTAssertEqual(allEntries.count, 3)
+        
+        // Delete the middle entry by ID
+        let idToDelete = savedIds[1]
+        let deleteResult = try dbManager.deleteEntryById(idToDelete)
+        XCTAssertTrue(deleteResult, "Deletion should return true for existing entry")
+        
+        // Verify we now have 2 entries
+        allEntries = try dbManager.getRecentEntries()
+        XCTAssertEqual(allEntries.count, 2)
+        
+        // Verify the deleted entry is gone
+        XCTAssertFalse(allEntries.contains { $0.id == idToDelete })
+        
+        // Verify the other entries remain
+        XCTAssertTrue(allEntries.contains { $0.id == savedIds[0] })
+        XCTAssertTrue(allEntries.contains { $0.id == savedIds[2] })
+        
+        // Try to delete an entry with a non-existent ID
+        let nonExistentId = UUID()
+        let deleteNonExistentResult = try dbManager.deleteEntryById(nonExistentId)
+        XCTAssertFalse(deleteNonExistentResult, "Deletion should return false for non-existent entry")
+        
+        // Verify we still have 2 entries
+        allEntries = try dbManager.getRecentEntries()
+        XCTAssertEqual(allEntries.count, 2)
+    }
 }
