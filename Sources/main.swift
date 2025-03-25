@@ -247,33 +247,103 @@ class DatabaseManager: @unchecked Sendable {
         }
     }
 
-    func deleteAllEntries() throws {
-        try dbQueue.write { db in
-            try db.execute(sql: "DELETE FROM clipboard_entries")
-        }
-    }
-
-    func deleteEntries(limit: Int? = nil) throws -> (deletedCount: Int, remainingCount: Int) {
+    func deleteEntries(type: String? = nil, query: String? = nil, startDate: Date? = nil, endDate: Date? = nil, range: String? = nil, limit: Int? = nil) throws -> (deletedCount: Int, remainingCount: Int) {
         try dbQueue.write { db in
             let totalCount = try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM clipboard_entries") ?? 0
-
+            
+            // Process range parameter if provided
+            var effectiveStartDate = startDate
+            var effectiveEndDate = endDate
+            
+            if let rangeStr = range, startDate == nil && endDate == nil {
+                if let dateRange = DateRange.parseRelative(rangeStr) {
+                    effectiveStartDate = dateRange.start
+                    effectiveEndDate = dateRange.end
+                }
+            }
+            
+            // Build the SQL query based on the parameters
+            var sql: String
+            var arguments: [DatabaseValueConvertible] = []
+            var conditions: [String] = []
+            
+            if let type = type {
+                // Handle common type aliases
+                let typeCondition: String
+                switch type.lowercased() {
+                case "url":
+                    typeCondition = "type LIKE '%url%'"
+                case "text", "textual":
+                    typeCondition = "type LIKE '%text%' OR type LIKE '%rtf%'"
+                default:
+                    typeCondition = "type = ?"
+                    arguments.append(type)
+                }
+                conditions.append(typeCondition)
+            }
+            
+            if let query = query {
+                conditions.append("content LIKE ?")
+                arguments.append("%\(query)%")
+            }
+            
+            if let startDate = effectiveStartDate {
+                conditions.append("timestamp >= ?")
+                arguments.append(startDate)
+            }
+            
+            if let endDate = effectiveEndDate {
+                conditions.append("timestamp <= ?")
+                arguments.append(endDate)
+            }
+            
+            // Construct the WHERE clause for conditions
+            let whereClause = conditions.isEmpty ? "" : "WHERE " + conditions.joined(separator: " AND ")
+            
             if let limit = limit {
-                try db.execute(sql: """
+                // If we have a limit, we need to use a subquery to get the IDs to delete
+                if !conditions.isEmpty {
+                    // With conditions and limit
+                    sql = """
                     DELETE FROM clipboard_entries
                     WHERE id IN (
-                        SELECT id
-                        FROM clipboard_entries
+                        SELECT id FROM clipboard_entries
+                        \(whereClause)
                         ORDER BY timestamp DESC
                         LIMIT ?
                     )
-                    """,
-                    arguments: [limit])
+                    """
+                    arguments.append(limit)
+                } else {
+                    // Just limit, no conditions
+                    sql = """
+                    DELETE FROM clipboard_entries
+                    WHERE id IN (
+                        SELECT id FROM clipboard_entries
+                        ORDER BY timestamp DESC
+                        LIMIT ?
+                    )
+                    """
+                    arguments.append(limit)
+                }
+            } else if !conditions.isEmpty {
+                // Only conditions, no limit
+                sql = "DELETE FROM clipboard_entries \(whereClause)"
             } else {
-                try db.execute(sql: "DELETE FROM clipboard_entries")
+                // No conditions at all, delete everything
+                sql = "DELETE FROM clipboard_entries"
             }
-
+            
+            try db.execute(sql: sql, arguments: StatementArguments(arguments))
+            
             let remainingCount = try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM clipboard_entries") ?? 0
             return (totalCount - remainingCount, remainingCount)
+        }
+    }
+
+    func deleteAllEntries() throws {
+        try dbQueue.write { db in
+            try db.execute(sql: "DELETE FROM clipboard_entries")
         }
     }
 }
@@ -472,7 +542,11 @@ func setupRoutes(_ app: Application, _ dbManager: DatabaseManager) throws {
     // DELETE /history?limit=100
     app.delete("history") { req -> Response in
         let limit = try? req.query.get(Int.self, at: "limit")
-        let (deletedCount, remainingCount) = try dbManager.deleteEntries(limit: limit)
+        let startDate = try? req.query.get(String.self, at: "start")
+        let endDate = try? req.query.get(String.self, at: "end")
+        let range = try? req.query.get(String.self, at: "range")
+        let formatter = ISO8601DateFormatter()
+        let (deletedCount, remainingCount) = try dbManager.deleteEntries(startDate: startDate.flatMap { formatter.date(from: $0) }, endDate: endDate.flatMap { formatter.date(from: $0) }, range: range, limit: limit)
         let response = Response(status: .ok)
         try response.content.encode([
             "deletedCount": deletedCount,
