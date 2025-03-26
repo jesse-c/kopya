@@ -1,15 +1,16 @@
-import Foundation
 import AppKit
-import GRDB
-import Vapor
 import ArgumentParser
+import Foundation
+import GRDB
+import Logging
 import ServiceManagement
 import TOMLKit
-import Logging
+import Vapor
 
 let logger = Logger(label: "com.jesse-c.kopya")
 
 // MARK: - API Models
+
 struct HistoryResponse: Content {
     let entries: [ClipboardEntryResponse]
     let total: Int
@@ -24,12 +25,12 @@ struct ClipboardEntryResponse: Content {
     let isTextual: Bool
 
     init(from entry: ClipboardEntry) {
-        self.id = entry.id ?? UUID()
-        self.content = entry.content
-        self.type = entry.type
-        self.humanReadableType = entry.humanReadableType
-        self.timestamp = entry.timestamp
-        self.isTextual = entry.isTextual
+        id = entry.id ?? UUID()
+        content = entry.content
+        type = entry.type
+        humanReadableType = entry.humanReadableType
+        timestamp = entry.timestamp
+        isTextual = entry.isTextual
     }
 }
 
@@ -52,12 +53,13 @@ struct PrivateModeStatusResponse: Content {
 }
 
 // MARK: - Clipboard History
+
 struct ClipboardEntry: Codable, FetchableRecord, PersistableRecord {
     static let databaseTableName = "clipboard_entries"
 
     var id: UUID?
     let content: String
-    let type: String  // Store as string since NSPasteboard.PasteboardType isn't Codable
+    let type: String // Store as string since NSPasteboard.PasteboardType isn't Codable
     let timestamp: Date
 
     var isTextual: Bool {
@@ -65,7 +67,7 @@ struct ClipboardEntry: Codable, FetchableRecord, PersistableRecord {
             NSPasteboard.PasteboardType.string.rawValue,
             NSPasteboard.PasteboardType.URL.rawValue,
             NSPasteboard.PasteboardType.fileURL.rawValue,
-            NSPasteboard.PasteboardType.rtf.rawValue
+            NSPasteboard.PasteboardType.rtf.rawValue,
         ].contains(type)
     }
 
@@ -113,50 +115,52 @@ struct ClipboardEntry: Codable, FetchableRecord, PersistableRecord {
     // Override database decoding to handle UUID format
     init(row: Row) throws {
         if let uuidString = row["id"] as String? {
-            self.id = UUID(uuidString: uuidString)
+            id = UUID(uuidString: uuidString)
         }
-        self.content = row["content"]
-        self.type = row["type"]
-        self.timestamp = row["timestamp"]
+        content = row["content"]
+        type = row["type"]
+        timestamp = row["timestamp"]
     }
 }
 
 // MARK: - Database Management
+
 class DatabaseManager: @unchecked Sendable {
     private let dbQueue: DatabaseQueue
     private let maxEntries: Int
     private let databasePath: String
     private var backupTimer: Timer?
     private let backupEnabled: Bool
-    
+
     init(databasePath: String? = nil, maxEntries: Int = 1000, backupEnabled: Bool = false) throws {
         let path = databasePath ?? "\(NSHomeDirectory())/Library/Application Support/Kopya/history.db"
         self.databasePath = path
         self.backupEnabled = backupEnabled
-        
+
         // Ensure directory exists
         try FileManager.default.createDirectory(
             atPath: (path as NSString).deletingLastPathComponent,
             withIntermediateDirectories: true
         )
-        
-        self.dbQueue = try DatabaseQueue(path: path)
+
+        dbQueue = try DatabaseQueue(path: path)
         self.maxEntries = maxEntries
-        
+
         // Initialize database schema
         try dbQueue.write { db in
             try db.create(table: "clipboard_entries", ifNotExists: true) { t in
-                t.column("id", .text).primaryKey().notNull()  // UUID stored as text
+                t.column("id", .text).primaryKey().notNull() // UUID stored as text
                 t.column("content", .text).notNull()
                 t.column("type", .text).notNull()
                 t.column("timestamp", .datetime).notNull()
-                t.uniqueKey(["content"])  // Ensure content is unique
+                t.uniqueKey(["content"]) // Ensure content is unique
             }
         }
-        
+
         // Clean up duplicate entries on startup
         try dbQueue.write { db in
-            try db.execute(sql: """
+            try db.execute(
+                sql: """
                 DELETE FROM clipboard_entries
                 WHERE id NOT IN (
                     SELECT MAX(id)
@@ -165,68 +169,68 @@ class DatabaseManager: @unchecked Sendable {
                 )
                 """)
         }
-        
+
         // Setup backup timer if enabled
         if backupEnabled {
             setupBackupTimer()
         }
     }
-    
+
     deinit {
         backupTimer?.invalidate()
     }
-    
+
     private func setupBackupTimer() {
         // Schedule hourly backups
         backupTimer = Timer.scheduledTimer(withTimeInterval: 3600, repeats: true) { [weak self] _ in
             self?.performBackup()
         }
-        
+
         // Run an initial backup
         performBackup()
     }
-    
+
     private func performBackup() {
         do {
             let backupDir = (databasePath as NSString).deletingLastPathComponent + "/backups"
-            
+
             // Ensure backup directory exists
             try FileManager.default.createDirectory(
                 atPath: backupDir,
                 withIntermediateDirectories: true
             )
-            
+
             // Create a timestamp for the backup file
             let dateFormatter = DateFormatter()
             dateFormatter.dateFormat = "yyyy-MM-dd_HH-mm-ss"
             let timestamp = dateFormatter.string(from: Date())
-            
+
             // Create backup file path
             let backupFilename = (databasePath as NSString).lastPathComponent
             let backupPath = "\(backupDir)/\(backupFilename)_\(timestamp).bak"
-            
+
             // Copy the database file
             try dbQueue.backup(to: DatabaseQueue(path: backupPath))
-            
+
             logger.info("Database backup created at \(backupPath)")
-            
+
             // Clean up old backups (keep last 72 backups = 3 days worth)
             cleanupOldBackups(backupDir: backupDir, maxBackups: 72)
         } catch {
             logger.error("Failed to create database backup: \(error.localizedDescription)")
         }
     }
-    
+
     private func cleanupOldBackups(backupDir: String, maxBackups: Int) {
         do {
             let fileManager = FileManager.default
             let backupFiles = try fileManager.contentsOfDirectory(atPath: backupDir)
                 .filter { $0.hasSuffix(".bak") }
                 .sorted()
-            
+
             if backupFiles.count > maxBackups {
                 // Delete oldest backups
-                for i in 0..<(backupFiles.count - maxBackups) {
+                for i in 0 ..< (backupFiles.count - maxBackups) {
                     let fileToDelete = "\(backupDir)/\(backupFiles[i])"
                     try fileManager.removeItem(atPath: fileToDelete)
                     logger.info("Deleted old backup: \(fileToDelete)")
@@ -240,7 +244,11 @@ class DatabaseManager: @unchecked Sendable {
     func saveEntry(_ entry: ClipboardEntry) throws -> Bool {
         try dbQueue.write { db in
             // Check if content already exists
-            let existingCount = try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM clipboard_entries WHERE content = ?", arguments: [entry.content]) ?? 0
+            let existingCount =
+                try Int.fetchOne(
+                    db, sql: "SELECT COUNT(*) FROM clipboard_entries WHERE content = ?",
+                    arguments: [entry.content]
+                ) ?? 0
 
             if existingCount == 0 {
                 // Insert new entry
@@ -253,7 +261,8 @@ class DatabaseManager: @unchecked Sendable {
                 // Clean up old entries if we exceed the limit
                 let totalCount = try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM clipboard_entries") ?? 0
                 if totalCount > maxEntries {
-                    try db.execute(sql: """
+                    try db.execute(
+                        sql: """
                         DELETE FROM clipboard_entries
                         WHERE id NOT IN (
                             SELECT id FROM clipboard_entries
@@ -261,31 +270,37 @@ class DatabaseManager: @unchecked Sendable {
                             LIMIT ?
                         )
                         """,
-                        arguments: [maxEntries])
+                        arguments: [maxEntries]
+                    )
                 }
 
                 return true
             } else {
                 // Update timestamp of existing entry to mark it as most recent
-                try db.execute(sql: """
+                try db.execute(
+                    sql: """
                     UPDATE clipboard_entries
                     SET timestamp = ?
                     WHERE content = ?
                     """,
-                    arguments: [entry.timestamp, entry.content])
+                    arguments: [entry.timestamp, entry.content]
+                )
 
                 return false
             }
         }
     }
 
-    func searchEntries(type: String? = nil, query: String? = nil, startDate: Date? = nil, endDate: Date? = nil, limit: Int? = nil) throws -> [ClipboardEntry] {
+    func searchEntries(
+        type: String? = nil, query: String? = nil, startDate: Date? = nil, endDate: Date? = nil,
+        limit: Int? = nil
+    ) throws -> [ClipboardEntry] {
         try dbQueue.read { db in
             var sql = "SELECT * FROM clipboard_entries"
             var conditions: [String] = []
             var arguments: [DatabaseValueConvertible] = []
 
-            if let type = type {
+            if let type {
                 // Handle common type aliases
                 let typeCondition: String
                 switch type.lowercased() {
@@ -300,17 +315,17 @@ class DatabaseManager: @unchecked Sendable {
                 conditions.append(typeCondition)
             }
 
-            if let query = query {
+            if let query {
                 conditions.append("content LIKE ?")
                 arguments.append("%\(query)%")
             }
 
-            if let startDate = startDate {
+            if let startDate {
                 conditions.append("timestamp >= ?")
                 arguments.append(startDate)
             }
 
-            if let endDate = endDate {
+            if let endDate {
                 conditions.append("timestamp <= ?")
                 arguments.append(endDate)
             }
@@ -321,7 +336,7 @@ class DatabaseManager: @unchecked Sendable {
 
             sql += " ORDER BY timestamp DESC"
 
-            if let limit = limit {
+            if let limit {
                 sql += " LIMIT ?"
                 arguments.append(limit)
             }
@@ -330,7 +345,9 @@ class DatabaseManager: @unchecked Sendable {
         }
     }
 
-    func getRecentEntries(limit: Int? = nil, startDate: Date? = nil, endDate: Date? = nil) throws -> [ClipboardEntry] {
+    func getRecentEntries(limit: Int? = nil, startDate: Date? = nil, endDate: Date? = nil) throws
+        -> [ClipboardEntry]
+    {
         try searchEntries(startDate: startDate, endDate: endDate, limit: limit)
     }
 
@@ -340,15 +357,24 @@ class DatabaseManager: @unchecked Sendable {
         }
     }
 
-    func deleteEntries(type: String? = nil, query: String? = nil, startDate: Date? = nil, endDate: Date? = nil, range: String? = nil, limit: Int? = nil) throws -> (deletedCount: Int, remainingCount: Int) {
+    func deleteEntries(
+        type: String? = nil,
+        query: String? = nil,
+        startDate: Date? = nil,
+        endDate: Date? = nil,
+        range: String? = nil,
+        limit: Int? = nil
+    ) throws -> (
+        deletedCount: Int, remainingCount: Int
+    ) {
         try dbQueue.write { db in
             let totalCount = try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM clipboard_entries") ?? 0
-            
+
             // Process range parameter if provided
             var effectiveStartDate = startDate
             var effectiveEndDate = endDate
-            
-            if let rangeStr = range, startDate == nil && endDate == nil {
+
+            if let rangeStr = range, startDate == nil, endDate == nil {
                 // For backward compatibility with tests, we need to handle range differently
                 // in the delete operation compared to other operations
                 if let dateRange = DateRange.parseRelative(rangeStr) {
@@ -360,13 +386,13 @@ class DatabaseManager: @unchecked Sendable {
                     effectiveEndDate = now
                 }
             }
-            
+
             // Build the SQL query based on the parameters
             var sql: String
             var arguments: [DatabaseValueConvertible] = []
             var conditions: [String] = []
-            
-            if let type = type {
+
+            if let type {
                 // Handle common type aliases
                 let typeCondition: String
                 switch type.lowercased() {
@@ -380,26 +406,26 @@ class DatabaseManager: @unchecked Sendable {
                 }
                 conditions.append(typeCondition)
             }
-            
-            if let query = query {
+
+            if let query {
                 conditions.append("content LIKE ?")
                 arguments.append("%\(query)%")
             }
-            
+
             if let startDate = effectiveStartDate {
                 conditions.append("timestamp >= ?")
                 arguments.append(startDate)
             }
-            
+
             if let endDate = effectiveEndDate {
                 conditions.append("timestamp <= ?")
                 arguments.append(endDate)
             }
-            
+
             // Construct the WHERE clause for conditions
             let whereClause = conditions.isEmpty ? "" : "WHERE " + conditions.joined(separator: " AND ")
-            
-            if let limit = limit {
+
+            if let limit {
                 // If we have a limit, we need to use a subquery to get the IDs to delete
                 if !conditions.isEmpty {
                     // With conditions and limit
@@ -432,9 +458,9 @@ class DatabaseManager: @unchecked Sendable {
                 // No conditions at all, delete everything
                 sql = "DELETE FROM clipboard_entries"
             }
-            
+
             try db.execute(sql: sql, arguments: StatementArguments(arguments))
-            
+
             let remainingCount = try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM clipboard_entries") ?? 0
             return (totalCount - remainingCount, remainingCount)
         }
@@ -445,14 +471,15 @@ class DatabaseManager: @unchecked Sendable {
             try db.execute(sql: "DELETE FROM clipboard_entries")
         }
     }
-    
+
     func deleteEntryById(_ id: UUID) throws -> Bool {
         try dbQueue.write { db in
             // Check if the entry exists
-            let exists = try ClipboardEntry
-                .filter(Column("id") == id.uuidString)
-                .fetchCount(db) > 0
-            
+            let exists =
+                try ClipboardEntry
+                    .filter(Column("id") == id.uuidString)
+                    .fetchCount(db) > 0
+
             if exists {
                 // Delete the entry
                 try db.execute(
@@ -461,13 +488,14 @@ class DatabaseManager: @unchecked Sendable {
                 )
                 return true
             }
-            
+
             return false
         }
     }
 }
 
 // MARK: - Configuration Management
+
 struct KopyaConfig: Codable {
     var runAtLogin: Bool
     var maxEntries: Int
@@ -498,8 +526,11 @@ class ConfigManager {
         do {
             // Check if file exists
             guard FileManager.default.fileExists(atPath: fileURL.path) else {
-                Self.logger.error("Config file not found at \(fileURL.path)")
-                throw NSError(domain: "ConfigManager", code: 1, userInfo: [NSLocalizedDescriptionKey: "Config file not found at \(fileURL.path)"])
+                logger.error("Config file not found at \(fileURL.path)")
+                throw NSError(
+                    domain: "ConfigManager", code: 1,
+                    userInfo: [NSLocalizedDescriptionKey: "Config file not found at \(fileURL.path)"]
+                )
             }
 
             // Read the file content
@@ -516,7 +547,10 @@ class ConfigManager {
                 configTable["runAtLogin"] = runAtLoginValue
             } else {
                 Self.logger.error("Missing 'run-at-login' in config")
-                throw NSError(domain: "ConfigManager", code: 3, userInfo: [NSLocalizedDescriptionKey: "Missing 'run-at-login' in config"])
+                throw NSError(
+                    domain: "ConfigManager", code: 3,
+                    userInfo: [NSLocalizedDescriptionKey: "Missing 'run-at-login' in config"]
+                )
             }
 
             // Extract and validate max-entries
@@ -524,7 +558,10 @@ class ConfigManager {
                 configTable["maxEntries"] = maxEntriesValue
             } else {
                 Self.logger.error("Missing 'max-entries' in config")
-                throw NSError(domain: "ConfigManager", code: 4, userInfo: [NSLocalizedDescriptionKey: "Missing 'max-entries' in config"])
+                throw NSError(
+                    domain: "ConfigManager", code: 4,
+                    userInfo: [NSLocalizedDescriptionKey: "Missing 'max-entries' in config"]
+                )
             }
 
             // Extract and validate port
@@ -532,7 +569,10 @@ class ConfigManager {
                 configTable["port"] = portValue
             } else {
                 Self.logger.error("Missing 'port' in config")
-                throw NSError(domain: "ConfigManager", code: 5, userInfo: [NSLocalizedDescriptionKey: "Missing 'port' in config"])
+                throw NSError(
+                    domain: "ConfigManager", code: 5,
+                    userInfo: [NSLocalizedDescriptionKey: "Missing 'port' in config"]
+                )
             }
 
             // Extract and validate backup
@@ -540,7 +580,10 @@ class ConfigManager {
                 configTable["backup"] = backupValue
             } else {
                 Self.logger.error("Missing 'backup' in config")
-                throw NSError(domain: "ConfigManager", code: 6, userInfo: [NSLocalizedDescriptionKey: "Missing 'backup' in config"])
+                throw NSError(
+                    domain: "ConfigManager", code: 6,
+                    userInfo: [NSLocalizedDescriptionKey: "Missing 'backup' in config"]
+                )
             }
 
             // Decode the table to our KopyaConfig struct
@@ -550,8 +593,14 @@ class ConfigManager {
             return config
 
         } catch let error as TOMLParseError {
-            Self.logger.error("TOML Parse Error: Line \(error.source.begin.line), Column \(error.source.begin.column)")
-            throw NSError(domain: "ConfigManager", code: 2, userInfo: [NSLocalizedDescriptionKey: "Failed to parse config: \(error.localizedDescription)"])
+            Self.logger.error(
+                "TOML Parse Error: Line \(error.source.begin.line), Column \(error.source.begin.column)")
+            throw NSError(
+                domain: "ConfigManager", code: 2,
+                userInfo: [
+                    NSLocalizedDescriptionKey: "Failed to parse config: \(error.localizedDescription)",
+                ]
+            )
         } catch {
             Self.logger.error("Error loading config: \(error.localizedDescription)")
             throw error
@@ -560,13 +609,14 @@ class ConfigManager {
 }
 
 // MARK: - Date Helpers
+
 struct DateRange {
     let start: Date
     let end: Date
 
     static func parseRelative(_ input: String, relativeTo now: Date = Date()) -> DateRange? {
         // Handle combined time formats like "1h30m"
-        if input.contains("h") && input.contains("m") {
+        if input.contains("h"), input.contains("m") {
             // Split by 'h' to get hours and minutes parts
             let parts = input.split(separator: "h")
             if parts.count == 2, let hours = Int(parts[0]), hours > 0 {
@@ -575,20 +625,21 @@ struct DateRange {
                 if minutesPart.hasSuffix("m"), let minutes = Int(minutesPart.dropLast()) {
                     // Calculate total seconds
                     let totalSeconds = (hours * 3600) + (minutes * 60)
-                    
+
                     // For time ranges, we want to calculate forward from now to now + duration
                     let end = now.addingTimeInterval(Double(totalSeconds))
-                    
+
                     return DateRange(start: now, end: end)
                 }
             }
             return nil
         }
-        
+
         // Original implementation for single unit formats
         // Parse number and unit
         guard let number = Int(String(input.dropLast())),
-              let unit = input.last else {
+              let unit = input.last
+        else {
             return nil
         }
 
@@ -621,6 +672,7 @@ struct DateRange {
 }
 
 // MARK: - API Routes
+
 func setupRoutes(_ app: Application, _ dbManager: DatabaseManager) throws {
     // GET /history?range=1h&limit=100
     app.get("history") { req -> HistoryResponse in
@@ -631,7 +683,7 @@ func setupRoutes(_ app: Application, _ dbManager: DatabaseManager) throws {
         var startDate: Date?
         var endDate: Date?
 
-        if let rangeStr = range, startDate == nil && endDate == nil {
+        if let rangeStr = range, startDate == nil, endDate == nil {
             // Try relative format first
             if let dateRange = DateRange.parseRelative(rangeStr) {
                 startDate = dateRange.start
@@ -657,24 +709,24 @@ func setupRoutes(_ app: Application, _ dbManager: DatabaseManager) throws {
         let query = try? req.query.get(String.self, at: "query")
         let range = try? req.query.get(String.self, at: "range")
         let limit = try? req.query.get(Int.self, at: "limit")
-        
+
         // Handle date range
         var startDate: Date?
         var endDate: Date?
-        
+
         // Check for explicit start and end dates
         if let startDateStr = try? req.query.get(String.self, at: "startDate") {
             let formatter = ISO8601DateFormatter()
             startDate = formatter.date(from: startDateStr)
         }
-        
+
         if let endDateStr = try? req.query.get(String.self, at: "endDate") {
             let formatter = ISO8601DateFormatter()
             endDate = formatter.date(from: endDateStr)
         }
-        
+
         // If explicit dates aren't provided, try using the range parameter
-        if let rangeStr = range, startDate == nil && endDate == nil {
+        if let rangeStr = range, startDate == nil, endDate == nil {
             // Try relative format first
             if let dateRange = DateRange.parseRelative(rangeStr) {
                 startDate = dateRange.start
@@ -699,37 +751,41 @@ func setupRoutes(_ app: Application, _ dbManager: DatabaseManager) throws {
         let endDate = try? req.query.get(String.self, at: "end")
         let range = try? req.query.get(String.self, at: "range")
         let formatter = ISO8601DateFormatter()
-        let (deletedCount, remainingCount) = try dbManager.deleteEntries(startDate: startDate.flatMap { formatter.date(from: $0) }, endDate: endDate.flatMap { formatter.date(from: $0) }, range: range, limit: limit)
+        let (deletedCount, remainingCount) = try dbManager.deleteEntries(
+            startDate: startDate.flatMap { formatter.date(from: $0) },
+            endDate: endDate.flatMap { formatter.date(from: $0) }, range: range, limit: limit
+        )
         let response = Response(status: .ok)
         try response.content.encode([
             "deletedCount": deletedCount,
-            "remainingCount": remainingCount
+            "remainingCount": remainingCount,
         ])
         return response
     }
-    
+
     // DELETE /history/:id
     app.delete("history", ":id") { req -> Response in
         guard let idString = req.parameters.get("id"),
-              let id = UUID(uuidString: idString) else {
+              let id = UUID(uuidString: idString)
+        else {
             throw Abort(.badRequest, reason: "Invalid UUID format")
         }
-        
+
         let success = try dbManager.deleteEntryById(id)
         let status: HTTPStatus = success ? .ok : .notFound
         let response = Response(status: status)
-        
+
         let responseData = DeleteByIdResponse(
             success: success,
             id: idString,
             message: success ? "Entry deleted successfully" : "Entry not found"
         )
-        
+
         try response.content.encode(responseData)
-        
+
         return response
     }
-    
+
     // Private mode endpoints
     app.post("private", "enable") { req -> PrivateModeResponse in
         let range = try? req.query.get(String.self, at: "range")
@@ -738,40 +794,40 @@ func setupRoutes(_ app: Application, _ dbManager: DatabaseManager) throws {
         guard let monitor = req.application.storage[ClipboardMonitorKey.self] else {
             throw Abort(.internalServerError, reason: "Clipboard monitor not available")
         }
-        
+
         monitor.enablePrivateMode(timeRange: range)
-        
+
         return PrivateModeResponse(
             success: true,
             message: "Private mode enabled" + (range != nil ? " for \(range!)" : "")
         )
     }
-    
+
     app.post("private", "disable") { req -> PrivateModeResponse in
         // Access the shared clipboard monitor instance
         guard let monitor = req.application.storage[ClipboardMonitorKey.self] else {
             throw Abort(.internalServerError, reason: "Clipboard monitor not available")
         }
-        
+
         monitor.disablePrivateMode()
-        
+
         return PrivateModeResponse(
             success: true,
             message: "Private mode disabled"
         )
     }
-    
+
     app.get("private", "status") { req -> PrivateModeStatusResponse in
         // Access the shared clipboard monitor instance
         guard let monitor = req.application.storage[ClipboardMonitorKey.self] else {
             throw Abort(.internalServerError, reason: "Clipboard monitor not available")
         }
-        
+
         let scheduledDisableTime = monitor.scheduledDisableTime
         let timerActive = scheduledDisableTime != nil
-        
+
         // Calculate remaining time in a human-readable format if timer is active
-        var remainingTimeString: String? = nil
+        var remainingTimeString: String?
         if timerActive, let disableTime = scheduledDisableTime {
             let remainingSeconds = Int(disableTime.timeIntervalSinceNow)
             if remainingSeconds > 0 {
@@ -786,14 +842,14 @@ func setupRoutes(_ app: Application, _ dbManager: DatabaseManager) throws {
                 remainingTimeString = "0s (timer about to fire)"
             }
         }
-        
+
         let response = PrivateModeStatusResponse(
             privateMode: !monitor.isMonitoring,
             timerActive: timerActive,
             scheduledDisableTime: scheduledDisableTime?.formatted(),
             remainingTime: remainingTimeString
         )
-        
+
         return response
     }
 }
@@ -804,6 +860,7 @@ struct ClipboardMonitorKey: StorageKey {
 }
 
 // MARK: - Clipboard Monitoring
+
 @available(macOS 13.0, *)
 class ClipboardMonitor: @unchecked Sendable {
     private let pasteboard = NSPasteboard.general
@@ -818,65 +875,67 @@ class ClipboardMonitor: @unchecked Sendable {
     private let monitoredTypes: [(NSPasteboard.PasteboardType, String)] = [
         (.URL, "public.url"),
         (.fileURL, "public.file-url"),
-        (.rtf, "public.rtf"),        // Prioritize RTF over plain text
+        (.rtf, "public.rtf"), // Prioritize RTF over plain text
         (.string, "public.utf8-plain-text"),
         (.pdf, "com.adobe.pdf"),
         (.png, "public.png"),
-        (.tiff, "public.tiff")
+        (.tiff, "public.tiff"),
     ]
 
     init(maxEntries: Int = 1000, backupEnabled: Bool = false) throws {
-        self.dbManager = try DatabaseManager(maxEntries: maxEntries, backupEnabled: backupEnabled)
-        self.lastChangeCount = NSPasteboard.general.changeCount
-        self.isMonitoring = true
+        dbManager = try DatabaseManager(maxEntries: maxEntries, backupEnabled: backupEnabled)
+        lastChangeCount = NSPasteboard.general.changeCount
+        isMonitoring = true
 
         // Print initial stats without processing current clipboard content
         let entryCount = try dbManager.getEntryCount()
         logger.notice("Database initialized with \(entryCount) entries")
         logger.notice("Maximum entries set to: \(maxEntries)")
     }
-    
+
     func enablePrivateMode(timeRange: String? = nil) {
         // Cancel any existing timer
         privateModeCancellable?.cancel()
         privateModeCancellable = nil
         scheduledDisableTime = nil
-        
+
         // Enable private mode
         isMonitoring = false
         logger.notice("Private mode enabled - clipboard monitoring disabled")
-        
+
         // If a time range is provided, schedule automatic disable
         if let rangeStr = timeRange, let dateRange = DateRange.parseRelative(rangeStr) {
             let timeInterval = dateRange.end.timeIntervalSince(dateRange.start)
-            
+
             // Store the scheduled disable time
             scheduledDisableTime = Date().addingTimeInterval(timeInterval)
-            
-            logger.notice("Private mode will automatically disable after \(rangeStr) at \(scheduledDisableTime!.formatted())")
-            
+
+            logger.notice(
+                "Private mode will automatically disable after \(rangeStr) at \(scheduledDisableTime!.formatted())"
+            )
+
             // Create a cancellable work item for disabling private mode
             let workItem = DispatchWorkItem { [weak self] in
-                guard let self = self else { return }
-                
+                guard let self else { return }
+
                 logger.notice("Private mode timer fired - clipboard monitoring resumed")
-                self.disablePrivateMode()
+                disablePrivateMode()
             }
-            
+
             // Store the work item so it can be cancelled if needed
             privateModeCancellable = workItem
-            
+
             // Schedule the work item to run after the specified time interval
             DispatchQueue.global().asyncAfter(deadline: .now() + timeInterval, execute: workItem)
         }
     }
-    
+
     func disablePrivateMode() {
         // Cancel any existing timer
         privateModeCancellable?.cancel()
         privateModeCancellable = nil
         scheduledDisableTime = nil
-        
+
         // Disable private mode
         isMonitoring = true
         logger.notice("Private mode disabled - clipboard monitoring resumed")
@@ -893,7 +952,7 @@ class ClipboardMonitor: @unchecked Sendable {
                 }
 
                 lastChangeCount = currentChangeCount
-                
+
                 // Skip processing if in private mode
                 guard isMonitoring else {
                     Thread.sleep(forTimeInterval: 0.5)
@@ -902,7 +961,7 @@ class ClipboardMonitor: @unchecked Sendable {
 
                 guard let types = pasteboard.types else { return }
                 logger.notice("Detected clipboard change!")
-                logger.notice("Available types: \(types.map { $0.rawValue })")
+                logger.notice("Available types: \(types.map(\.rawValue))")
 
                 // Find the highest priority type that's available
                 let availableType = monitoredTypes.first { type in
@@ -910,7 +969,8 @@ class ClipboardMonitor: @unchecked Sendable {
                 }
 
                 if let (type, rawType) = availableType,
-                   let clipboardString = getString(for: type, rawType: rawType) {
+                   let clipboardString = getString(for: type, rawType: rawType)
+                {
                     // Only process if content has actually changed
                     if clipboardString != lastContent {
                         lastContent = clipboardString
@@ -966,7 +1026,8 @@ class ClipboardMonitor: @unchecked Sendable {
             }
             // Then try string type for URLs
             if let text = pasteboard.string(forType: .string),
-               text.lowercased().hasPrefix("http") {
+               text.lowercased().hasPrefix("http")
+            {
                 return text
             }
             return nil
@@ -992,6 +1053,7 @@ class ClipboardMonitor: @unchecked Sendable {
 }
 
 // MARK: - Main
+
 @main
 struct Kopya: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
@@ -999,10 +1061,15 @@ struct Kopya: AsyncParsableCommand {
         version: Version.version
     )
 
-    @ArgumentParser.Option(name: [.customShort("p"), .long], help: "Port to run the server on (overrides config value)")
+    @ArgumentParser.Option(
+        name: [.customShort("p"), .long], help: "Port to run the server on (overrides config value)"
+    )
     var port: Int?
 
-    @ArgumentParser.Option(name: [.customShort("m"), .long], help: "Maximum number of clipboard entries to store (overrides config value)")
+    @ArgumentParser.Option(
+        name: [.customShort("m"), .long],
+        help: "Maximum number of clipboard entries to store (overrides config value)"
+    )
     var maxEntries: Int?
 
     mutating func run() async throws {
@@ -1045,7 +1112,9 @@ struct Kopya: AsyncParsableCommand {
         signal(SIGINT, SIG_IGN)
         signal(SIGTERM, SIG_IGN)
 
-        let dbManager = try DatabaseManager(maxEntries: maxEntries, backupEnabled: configManager.config.backup)
+        let dbManager = try DatabaseManager(
+            maxEntries: maxEntries, backupEnabled: configManager.config.backup
+        )
 
         // Configure and start Vapor server
         var env = try Environment.detect()
@@ -1058,10 +1127,10 @@ struct Kopya: AsyncParsableCommand {
 
         // Create clipboard monitor
         let clipboardMonitor = try ClipboardMonitor(
-            maxEntries: maxEntries, 
+            maxEntries: maxEntries,
             backupEnabled: configManager.config.backup
         )
-        
+
         // Store the clipboard monitor in the application storage for access in routes
         app.storage[ClipboardMonitorKey.self] = clipboardMonitor
 
@@ -1083,11 +1152,11 @@ struct Kopya: AsyncParsableCommand {
         let isCurrentlyEnabled = currentStatus == .enabled
 
         // Only make changes if necessary
-        if enabled && !isCurrentlyEnabled {
+        if enabled, !isCurrentlyEnabled {
             logger.notice("Config specifies run at login: enabling...")
             try SMAppService.mainApp.register()
             logger.notice("Successfully enabled run at login")
-        } else if !enabled && isCurrentlyEnabled {
+        } else if !enabled, isCurrentlyEnabled {
             logger.notice("Config specifies no run at login: disabling...")
             try SMAppService.mainApp.unregister()
             logger.notice("Successfully disabled run at login")
