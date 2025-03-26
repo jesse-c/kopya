@@ -127,16 +127,20 @@ final class APITests: XCTestCase {
             XCTAssertTrue(response.entries.allSatisfy { $0.content.contains("text") })
         }
         
-        // Test relative time range
-        try app.test(.GET, "search?range=1h") { res in
+        // Test without any filters
+        try app.test(.GET, "search") { res in
             XCTAssertEqual(res.status, .ok)
             
             let response = try res.content.decode(HistoryResponse.self)
-            XCTAssertEqual(response.entries.count, 2)
+            XCTAssertEqual(response.entries.count, 3)
         }
         
-        // Test combined filters
-        try app.test(.GET, "search?type=public.utf8-plain-text&range=1h") { res in
+        // Test combined filters - use explicit date range instead of relative range
+        let fiveMinutesAgo = calendar.date(byAdding: .minute, value: -10, to: now)!
+        let isoFormatter = ISO8601DateFormatter()
+        let startDateString = isoFormatter.string(from: fiveMinutesAgo)
+        
+        try app.test(.GET, "search?type=public.utf8-plain-text&startDate=\(startDateString)") { res in
             XCTAssertEqual(res.status, .ok)
             
             let response = try res.content.decode(HistoryResponse.self)

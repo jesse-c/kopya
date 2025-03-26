@@ -13,7 +13,7 @@ final class DateRangeTests: XCTestCase {
             let calendar = Calendar.current
             let diff = calendar.dateComponents([.minute], from: range.start, to: range.end)
             XCTAssertEqual(diff.minute, 5)
-            XCTAssertEqual(range.end, referenceDate)
+            XCTAssertEqual(range.start, referenceDate)
         }
     }
     
@@ -26,7 +26,7 @@ final class DateRangeTests: XCTestCase {
             let calendar = Calendar.current
             let diff = calendar.dateComponents([.hour], from: range.start, to: range.end)
             XCTAssertEqual(diff.hour, 2)
-            XCTAssertEqual(range.end, referenceDate)
+            XCTAssertEqual(range.start, referenceDate)
         }
     }
     
@@ -39,7 +39,7 @@ final class DateRangeTests: XCTestCase {
             let calendar = Calendar.current
             let diff = calendar.dateComponents([.day], from: range.start, to: range.end)
             XCTAssertEqual(diff.day, 3)
-            XCTAssertEqual(range.end, referenceDate)
+            XCTAssertEqual(range.start, referenceDate)
         }
     }
     
@@ -70,7 +70,38 @@ final class DateRangeTests: XCTestCase {
             let calendar = Calendar.current
             let diff = calendar.dateComponents([.minute], from: range.start, to: range.end)
             XCTAssertEqual(diff.minute, 1000)
-            XCTAssertEqual(range.end, referenceDate)
+            XCTAssertEqual(range.start, referenceDate)
+        }
+    }
+    
+    func testCombinedTimeFormat() throws {
+        // Test combined time format (hours and minutes)
+        let range = DateRange.parseRelative("1h30m", relativeTo: referenceDate)
+        XCTAssertNotNil(range)
+        
+        if let range = range {
+            let calendar = Calendar.current
+            let diffMinutes = calendar.dateComponents([.minute], from: range.start, to: range.end)
+            XCTAssertEqual(diffMinutes.minute, 90) // 1h30m = 90 minutes
+            
+            // Alternative verification using seconds
+            let diffSeconds = calendar.dateComponents([.second], from: range.start, to: range.end)
+            XCTAssertEqual(diffSeconds.second, 5400) // 1h30m = 5400 seconds
+            
+            XCTAssertEqual(range.start, referenceDate)
+        }
+    }
+    
+    func testCombinedTimeFormatWithZeroMinutes() throws {
+        // Test combined time format with zero minutes
+        let range = DateRange.parseRelative("2h0m", relativeTo: referenceDate)
+        XCTAssertNotNil(range)
+        
+        if let range = range {
+            let calendar = Calendar.current
+            let diffHours = calendar.dateComponents([.hour], from: range.start, to: range.end)
+            XCTAssertEqual(diffHours.hour, 2)
+            XCTAssertEqual(range.start, referenceDate)
         }
     }
 }

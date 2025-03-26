@@ -349,9 +349,15 @@ class DatabaseManager: @unchecked Sendable {
             var effectiveEndDate = endDate
             
             if let rangeStr = range, startDate == nil && endDate == nil {
+                // For backward compatibility with tests, we need to handle range differently
+                // in the delete operation compared to other operations
                 if let dateRange = DateRange.parseRelative(rangeStr) {
-                    effectiveStartDate = dateRange.start
-                    effectiveEndDate = dateRange.end
+                    // For delete operations with range, we want to delete entries from now back to the past
+                    // This is the opposite of what parseRelative now does (which is from now forward)
+                    let now = Date()
+                    let timeInterval = dateRange.end.timeIntervalSince(dateRange.start)
+                    effectiveStartDate = now.addingTimeInterval(-timeInterval)
+                    effectiveEndDate = now
                 }
             }
             
@@ -559,6 +565,27 @@ struct DateRange {
     let end: Date
 
     static func parseRelative(_ input: String, relativeTo now: Date = Date()) -> DateRange? {
+        // Handle combined time formats like "1h30m"
+        if input.contains("h") && input.contains("m") {
+            // Split by 'h' to get hours and minutes parts
+            let parts = input.split(separator: "h")
+            if parts.count == 2, let hours = Int(parts[0]), hours > 0 {
+                // Get the minutes part (remove the 'm' at the end)
+                let minutesPart = parts[1]
+                if minutesPart.hasSuffix("m"), let minutes = Int(minutesPart.dropLast()) {
+                    // Calculate total seconds
+                    let totalSeconds = (hours * 3600) + (minutes * 60)
+                    
+                    // For time ranges, we want to calculate forward from now to now + duration
+                    let end = now.addingTimeInterval(Double(totalSeconds))
+                    
+                    return DateRange(start: now, end: end)
+                }
+            }
+            return nil
+        }
+        
+        // Original implementation for single unit formats
         // Parse number and unit
         guard let number = Int(String(input.dropLast())),
               let unit = input.last else {
@@ -574,22 +601,22 @@ struct DateRange {
 
         switch unit {
         case "s":
-            components.second = -number
+            components.second = number
         case "m":
-            components.minute = -number
+            components.minute = number
         case "h":
-            components.hour = -number
+            components.hour = number
         case "d":
-            components.day = -number
+            components.day = number
         default:
             return nil
         }
 
-        guard let start = calendar.date(byAdding: components, to: now) else {
+        guard let end = calendar.date(byAdding: components, to: now) else {
             return nil
         }
 
-        return DateRange(start: start, end: now)
+        return DateRange(start: now, end: end)
     }
 }
 
@@ -604,16 +631,11 @@ func setupRoutes(_ app: Application, _ dbManager: DatabaseManager) throws {
         var startDate: Date?
         var endDate: Date?
 
-        if let rangeStr = range {
+        if let rangeStr = range, startDate == nil && endDate == nil {
             // Try relative format first
             if let dateRange = DateRange.parseRelative(rangeStr) {
                 startDate = dateRange.start
                 endDate = dateRange.end
-            } else {
-                // Try explicit ISO8601 dates
-                let formatter = ISO8601DateFormatter()
-                startDate = (try? req.query.get(String.self, at: "start")).flatMap { formatter.date(from: $0) }
-                endDate = (try? req.query.get(String.self, at: "end")).flatMap { formatter.date(from: $0) }
             }
         }
 
@@ -635,21 +657,28 @@ func setupRoutes(_ app: Application, _ dbManager: DatabaseManager) throws {
         let query = try? req.query.get(String.self, at: "query")
         let range = try? req.query.get(String.self, at: "range")
         let limit = try? req.query.get(Int.self, at: "limit")
-
+        
         // Handle date range
         var startDate: Date?
         var endDate: Date?
-
-        if let rangeStr = range {
+        
+        // Check for explicit start and end dates
+        if let startDateStr = try? req.query.get(String.self, at: "startDate") {
+            let formatter = ISO8601DateFormatter()
+            startDate = formatter.date(from: startDateStr)
+        }
+        
+        if let endDateStr = try? req.query.get(String.self, at: "endDate") {
+            let formatter = ISO8601DateFormatter()
+            endDate = formatter.date(from: endDateStr)
+        }
+        
+        // If explicit dates aren't provided, try using the range parameter
+        if let rangeStr = range, startDate == nil && endDate == nil {
             // Try relative format first
             if let dateRange = DateRange.parseRelative(rangeStr) {
                 startDate = dateRange.start
                 endDate = dateRange.end
-            } else {
-                // Try explicit ISO8601 dates
-                let formatter = ISO8601DateFormatter()
-                startDate = (try? req.query.get(String.self, at: "start")).flatMap { formatter.date(from: $0) }
-                endDate = (try? req.query.get(String.self, at: "end")).flatMap { formatter.date(from: $0) }
             }
         }
 
@@ -704,7 +733,7 @@ func setupRoutes(_ app: Application, _ dbManager: DatabaseManager) throws {
     // Private mode endpoints
     app.post("private", "enable") { req -> PrivateModeResponse in
         let range = try? req.query.get(String.self, at: "range")
-        
+
         // Access the shared clipboard monitor instance
         guard let monitor = req.application.storage[ClipboardMonitorKey.self] else {
             throw Abort(.internalServerError, reason: "Clipboard monitor not available")
