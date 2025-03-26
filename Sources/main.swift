@@ -39,6 +39,18 @@ struct DeleteByIdResponse: Content {
     let message: String
 }
 
+struct PrivateModeResponse: Content {
+    let success: Bool
+    let message: String
+}
+
+struct PrivateModeStatusResponse: Content {
+    let privateMode: Bool
+    let timerActive: Bool
+    let scheduledDisableTime: String?
+    let remainingTime: String?
+}
+
 // MARK: - Clipboard History
 struct ClipboardEntry: Codable, FetchableRecord, PersistableRecord {
     static let databaseTableName = "clipboard_entries"
@@ -561,6 +573,8 @@ struct DateRange {
         var components = DateComponents()
 
         switch unit {
+        case "s":
+            components.second = -number
         case "m":
             components.minute = -number
         case "h":
@@ -686,15 +700,90 @@ func setupRoutes(_ app: Application, _ dbManager: DatabaseManager) throws {
         
         return response
     }
+    
+    // Private mode endpoints
+    app.post("private", "enable") { req -> PrivateModeResponse in
+        let range = try? req.query.get(String.self, at: "range")
+        
+        // Access the shared clipboard monitor instance
+        guard let monitor = req.application.storage[ClipboardMonitorKey.self] else {
+            throw Abort(.internalServerError, reason: "Clipboard monitor not available")
+        }
+        
+        monitor.enablePrivateMode(timeRange: range)
+        
+        return PrivateModeResponse(
+            success: true,
+            message: "Private mode enabled" + (range != nil ? " for \(range!)" : "")
+        )
+    }
+    
+    app.post("private", "disable") { req -> PrivateModeResponse in
+        // Access the shared clipboard monitor instance
+        guard let monitor = req.application.storage[ClipboardMonitorKey.self] else {
+            throw Abort(.internalServerError, reason: "Clipboard monitor not available")
+        }
+        
+        monitor.disablePrivateMode()
+        
+        return PrivateModeResponse(
+            success: true,
+            message: "Private mode disabled"
+        )
+    }
+    
+    app.get("private", "status") { req -> PrivateModeStatusResponse in
+        // Access the shared clipboard monitor instance
+        guard let monitor = req.application.storage[ClipboardMonitorKey.self] else {
+            throw Abort(.internalServerError, reason: "Clipboard monitor not available")
+        }
+        
+        let scheduledDisableTime = monitor.scheduledDisableTime
+        let timerActive = scheduledDisableTime != nil
+        
+        // Calculate remaining time in a human-readable format if timer is active
+        var remainingTimeString: String? = nil
+        if timerActive, let disableTime = scheduledDisableTime {
+            let remainingSeconds = Int(disableTime.timeIntervalSinceNow)
+            if remainingSeconds > 0 {
+                let minutes = remainingSeconds / 60
+                let seconds = remainingSeconds % 60
+                if minutes > 0 {
+                    remainingTimeString = "\(minutes)m \(seconds)s"
+                } else {
+                    remainingTimeString = "\(seconds)s"
+                }
+            } else {
+                remainingTimeString = "0s (timer about to fire)"
+            }
+        }
+        
+        let response = PrivateModeStatusResponse(
+            privateMode: !monitor.isMonitoring,
+            timerActive: timerActive,
+            scheduledDisableTime: scheduledDisableTime?.formatted(),
+            remainingTime: remainingTimeString
+        )
+        
+        return response
+    }
+}
+
+// Storage key for the clipboard monitor
+struct ClipboardMonitorKey: StorageKey {
+    typealias Value = ClipboardMonitor
 }
 
 // MARK: - Clipboard Monitoring
 @available(macOS 13.0, *)
-class ClipboardMonitor {
+class ClipboardMonitor: @unchecked Sendable {
     private let pasteboard = NSPasteboard.general
     private var lastContent: String?
     private var lastChangeCount: Int
     private let dbManager: DatabaseManager
+    private(set) var isMonitoring: Bool = true
+    private(set) var scheduledDisableTime: Date?
+    private var privateModeCancellable: DispatchWorkItem?
 
     // Types in order of priority
     private let monitoredTypes: [(NSPasteboard.PasteboardType, String)] = [
@@ -710,11 +799,58 @@ class ClipboardMonitor {
     init(maxEntries: Int = 1000, backupEnabled: Bool = false) throws {
         self.dbManager = try DatabaseManager(maxEntries: maxEntries, backupEnabled: backupEnabled)
         self.lastChangeCount = NSPasteboard.general.changeCount
+        self.isMonitoring = true
 
         // Print initial stats without processing current clipboard content
         let entryCount = try dbManager.getEntryCount()
         logger.notice("Database initialized with \(entryCount) entries")
         logger.notice("Maximum entries set to: \(maxEntries)")
+    }
+    
+    func enablePrivateMode(timeRange: String? = nil) {
+        // Cancel any existing timer
+        privateModeCancellable?.cancel()
+        privateModeCancellable = nil
+        scheduledDisableTime = nil
+        
+        // Enable private mode
+        isMonitoring = false
+        logger.notice("Private mode enabled - clipboard monitoring disabled")
+        
+        // If a time range is provided, schedule automatic disable
+        if let rangeStr = timeRange, let dateRange = DateRange.parseRelative(rangeStr) {
+            let timeInterval = dateRange.end.timeIntervalSince(dateRange.start)
+            
+            // Store the scheduled disable time
+            scheduledDisableTime = Date().addingTimeInterval(timeInterval)
+            
+            logger.notice("Private mode will automatically disable after \(rangeStr) at \(scheduledDisableTime!.formatted())")
+            
+            // Create a cancellable work item for disabling private mode
+            let workItem = DispatchWorkItem { [weak self] in
+                guard let self = self else { return }
+                
+                logger.notice("Private mode timer fired - clipboard monitoring resumed")
+                self.disablePrivateMode()
+            }
+            
+            // Store the work item so it can be cancelled if needed
+            privateModeCancellable = workItem
+            
+            // Schedule the work item to run after the specified time interval
+            DispatchQueue.global().asyncAfter(deadline: .now() + timeInterval, execute: workItem)
+        }
+    }
+    
+    func disablePrivateMode() {
+        // Cancel any existing timer
+        privateModeCancellable?.cancel()
+        privateModeCancellable = nil
+        scheduledDisableTime = nil
+        
+        // Disable private mode
+        isMonitoring = true
+        logger.notice("Private mode disabled - clipboard monitoring resumed")
     }
 
     func startMonitoring() {
@@ -728,6 +864,12 @@ class ClipboardMonitor {
                 }
 
                 lastChangeCount = currentChangeCount
+                
+                // Skip processing if in private mode
+                guard isMonitoring else {
+                    Thread.sleep(forTimeInterval: 0.5)
+                    return
+                }
 
                 guard let types = pasteboard.types else { return }
                 logger.notice("Detected clipboard change!")
@@ -885,21 +1027,24 @@ struct Kopya: AsyncParsableCommand {
         // Set the port in the application configuration
         app.http.server.configuration.port = port
 
+        // Create clipboard monitor
+        let clipboardMonitor = try ClipboardMonitor(
+            maxEntries: maxEntries, 
+            backupEnabled: configManager.config.backup
+        )
+        
+        // Store the clipboard monitor in the application storage for access in routes
+        app.storage[ClipboardMonitorKey.self] = clipboardMonitor
+
         try setupRoutes(app, dbManager)
 
-        // Start clipboard monitoring in a background task
-        let monitorTask = Task {
+        // Start the Vapor server in a background task
+        Task {
             try await app.execute()
         }
 
         // Start monitoring clipboard in the main thread
-        do {
-            try ClipboardMonitor(maxEntries: maxEntries, backupEnabled: configManager.config.backup).startMonitoring()
-        } catch {
-            logger.error("Error in clipboard monitoring: \(error)")
-            monitorTask.cancel()
-            Foundation.exit(1)
-        }
+        clipboardMonitor.startMonitoring()
     }
 
     // Function to sync run-at-login setting with config
