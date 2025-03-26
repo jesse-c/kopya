@@ -48,6 +48,14 @@ release:
 test:
     swift test -v -Xswiftc -parse-as-library
 
+# Run linting
+lint:
+    swiftlint --config .swiftlint.yml
+
+# Run formating
+format:
+    swiftformat .
+
 # Clean build artifacts
 clean:
     swift package clean
