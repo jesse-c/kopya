@@ -480,16 +480,16 @@ class DatabaseManager: @unchecked Sendable {
                     .filter(Column("id") == id.uuidString)
                     .fetchCount(db) > 0
 
-            if exists {
-                // Delete the entry
-                try db.execute(
-                    sql: "DELETE FROM clipboard_entries WHERE id = ?",
-                    arguments: [id.uuidString]
-                )
-                return true
+            guard exists else {
+                return false // Entry not found
             }
 
-            return false
+            // Delete the entry
+            try ClipboardEntry
+                .filter(Column("id") == id.uuidString)
+                .deleteAll(db)
+
+            return true // Entry deleted successfully
         }
     }
 }
