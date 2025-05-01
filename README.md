@@ -49,6 +49,7 @@ Use `$ just release install` or download a [release](https://github.com/jesse-c/
 ## Clients
 
 - Raycast extension: [WIP](https://github.com/jesse-c/extensions/tree/feat/add-kopya/extensions/kopya)
+- Emacs package: [WIP](https://github.com/jesse-c/dotfiles/blob/main/home/dot_config/emacs/user/kopya.el)
 
 [^1]: https://j-e-s-s-e.com/blog/multi-uis-for-a-daemon-and-using-grpc-to-communicate-locally-from-rust-swift
 [^2]: https://j-e-s-s-e.com/blog/alpha-release-of-kopya
