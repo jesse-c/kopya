@@ -36,6 +36,17 @@ version:
     echo "    static let version = \"$VERSION\"" >> Sources/Version.swift
     echo "}" >> Sources/Version.swift
 
+# Create a git tag with specified version and push it to origin
+# Example: just tag v0.1.0
+tag VERSION:
+    #!/usr/bin/env bash
+    set -e
+    echo "Creating git tag: {{VERSION}}"
+    git tag {{VERSION}}
+    echo "Pushing tag to origin"
+    git push origin {{VERSION}}
+    echo "Tag {{VERSION}} created and pushed successfully"
+
 # Build in debug mode
 debug:
     swift build -Xswiftc -parse-as-library --product kopya
