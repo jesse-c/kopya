@@ -39,6 +39,9 @@ let package = Package(
                 "Kopya",
                 .product(name: "XCTVapor", package: "vapor"),
             ],
+            resources: [
+                .process("test_config.toml"),
+            ],
             swiftSettings: [
                 .unsafeFlags(["-parse-as-library"]),
             ]

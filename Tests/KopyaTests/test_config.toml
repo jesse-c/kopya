@@ -1,0 +1,6 @@
+run-at-login = false
+max-entries = 1000
+port = 8080
+backup = false
+filter = false
+filters = []

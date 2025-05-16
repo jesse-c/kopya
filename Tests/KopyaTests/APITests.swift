@@ -8,6 +8,7 @@ final class APITests: XCTestCase {
     var app: Application!
     var dbManager: DatabaseManager!
     var dbPath: String!
+    var configManager: ConfigManager!
 
     private func createTestDatabase() throws -> (DatabaseManager, String) {
         let tempDir = FileManager.default.temporaryDirectory
@@ -29,6 +30,16 @@ final class APITests: XCTestCase {
 
         app = createApplication()
         app.http.server.configuration.port = Int.random(in: 8080 ... 9000)
+
+        let testConfigPath = URL(fileURLWithPath: "./Tests/KopyaTests/test_config.toml").standardizedFileURL
+        let fileManager = FileManager.default
+        let configPath: URL
+        if fileManager.fileExists(atPath: testConfigPath.path) {
+            configPath = testConfigPath
+        } else {
+            fatalError("test_config.toml not found at \(testConfigPath.path)")
+        }
+        configManager = try ConfigManager(configFile: configPath)
     }
 
     override func tearDownWithError() throws {
@@ -59,7 +70,7 @@ final class APITests: XCTestCase {
         _ = try dbManager.saveEntry(entry1)
         _ = try dbManager.saveEntry(entry2)
 
-        try setupRoutes(app, dbManager)
+        try setupRoutes(app, dbManager, configManager)
 
         // Define a response structure to match the API
         struct HistoryResponse: Content {
@@ -107,7 +118,7 @@ final class APITests: XCTestCase {
             _ = try dbManager.saveEntry(entry)
         }
 
-        try setupRoutes(app, dbManager)
+        try setupRoutes(app, dbManager, configManager)
 
         // Test type filter
         try app.test(.GET, "search?type=public.url") { res in
@@ -164,7 +175,7 @@ final class APITests: XCTestCase {
             _ = try dbManager.saveEntry(entry)
         }
 
-        try setupRoutes(app, dbManager)
+        try setupRoutes(app, dbManager, configManager)
 
         // Test delete with limit
         try app.test(.DELETE, "history?limit=3") { res in
@@ -202,7 +213,7 @@ final class APITests: XCTestCase {
             _ = try dbManager.saveEntry(entry)
         }
 
-        try setupRoutes(app, dbManager)
+        try setupRoutes(app, dbManager, configManager)
 
         // Format dates for API request
         let formatter = ISO8601DateFormatter()
@@ -256,7 +267,7 @@ final class APITests: XCTestCase {
             _ = try dbManager.saveEntry(entry)
         }
 
-        try setupRoutes(app, dbManager)
+        try setupRoutes(app, dbManager, configManager)
 
         // Test delete with time range (last 2 hours)
         try app.test(.DELETE, "history?range=2h") { res in
@@ -303,7 +314,7 @@ final class APITests: XCTestCase {
             _ = try dbManager.saveEntry(entry)
         }
 
-        try setupRoutes(app, dbManager)
+        try setupRoutes(app, dbManager, configManager)
 
         // Format date for API request
         let formatter = ISO8601DateFormatter()
@@ -354,7 +365,7 @@ final class APITests: XCTestCase {
             _ = try dbManager.saveEntry(entry)
         }
 
-        try setupRoutes(app, dbManager)
+        try setupRoutes(app, dbManager, configManager)
 
         // Format dates for API request
         let formatter = ISO8601DateFormatter()
@@ -400,7 +411,7 @@ final class APITests: XCTestCase {
             _ = try dbManager.saveEntry(entry)
         }
 
-        try setupRoutes(app, dbManager)
+        try setupRoutes(app, dbManager, configManager)
 
         // Get all entries to find the one we want to delete
         let entries = try dbManager.getRecentEntries()
@@ -474,7 +485,7 @@ final class APITests: XCTestCase {
         // Store the monitor in the application storage
         app.storage[ClipboardMonitorKey.self] = clipboardMonitor
 
-        try setupRoutes(app, dbManager)
+        try setupRoutes(app, dbManager, configManager)
 
         // Test enabling private mode
         try app.test(.POST, "private/enable") { res in

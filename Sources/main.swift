@@ -501,25 +501,47 @@ struct KopyaConfig: Codable {
     var maxEntries: Int
     var port: Int
     var backup: Bool
+    var filter: Bool
+    var filters: [String]?
 }
 
 class ConfigManager {
     private let configFile: URL
     private(set) var config: KopyaConfig
 
+    // Cache for compiled regex patterns
+    private var compiledFilterPatterns: [Regex<Substring>]
+
     // Create a static logger for the ConfigManager class
     private static let logger = Logger(label: "com.jesse-c.kopya.config")
 
-    init() throws {
-        // Get user's home directory
-        let homeDirectory = FileManager.default.homeDirectoryForCurrentUser
-
-        // Create the config file path
-        configFile = homeDirectory.appendingPathComponent(".config/kopya/config.toml")
+    init(configFile: URL? = nil) throws {
+        // Use provided config file or default to user's home directory
+        if let configFile {
+            self.configFile = configFile
+        } else {
+            let homeDirectory = FileManager.default.homeDirectoryForCurrentUser
+            self.configFile = homeDirectory.appendingPathComponent(".config/kopya/config.toml")
+        }
 
         // Load config - will throw an error if file doesn't exist
-        config = try Self.loadConfig(from: configFile)
-        Self.logger.info("Loaded config from \(configFile.path)")
+        config = try Self.loadConfig(from: self.configFile)
+        Self.logger.info("Loaded config from \(self.configFile.path)")
+
+        // Compile filter patterns once at startup
+        if config.filter, let patterns = config.filters, !patterns.isEmpty {
+            compiledFilterPatterns = patterns.compactMap { pattern in
+                do {
+                    return try Regex(pattern)
+                } catch {
+                    Self.logger.error("Failed to parse filter pattern '\(pattern)' to Regex: \(error.localizedDescription)")
+                    return nil
+                }
+            }
+            Self.logger.notice("Compiled \(compiledFilterPatterns.count) filter patterns to Regex objects")
+        } else {
+            compiledFilterPatterns = []
+        }
     }
 
     private static func loadConfig(from fileURL: URL) throws -> KopyaConfig {
@@ -586,6 +608,24 @@ class ConfigManager {
                 )
             }
 
+            // Extract filter (optional, defaults to false)
+            if let filterValue = toml["filter"] {
+                configTable["filter"] = filterValue
+            } else {
+                // Default to false if missing
+                configTable["filter"] = TOMLValue(false)
+                Self.logger.info("Missing 'filter' in config, defaulting to false.")
+            }
+
+            // Extract filters
+            if let filtersArray = toml["filters"] {
+                configTable["filters"] = filtersArray
+            } else if let filterEnabled = toml["filter"]?.bool, filterEnabled {
+                // Empty array if filter is enabled but no patterns specified
+                configTable["filters"] = TOMLValue([])
+                Self.logger.info("Missing 'filters' in config, no patterns will be applied.")
+            }
+
             // Decode the table to our KopyaConfig struct
             let decoder = TOMLDecoder()
             let config = try decoder.decode(KopyaConfig.self, from: configTable)
@@ -605,6 +645,28 @@ class ConfigManager {
             Self.logger.error("Error loading config: \(error.localizedDescription)")
             throw error
         }
+    }
+
+    // Parse string patterns into Swift Regex objects directly
+    func getFilterRegexPatterns() -> [Regex<Substring>] {
+        compiledFilterPatterns
+    }
+
+    // Check if content should be filtered based on filter patterns
+    func shouldFilter(_ content: String) -> Bool {
+        // No patterns means no filtering
+        guard !compiledFilterPatterns.isEmpty else {
+            return false
+        }
+
+        // Check if content matches any of the filter patterns
+        for pattern in compiledFilterPatterns {
+            if content.contains(pattern) {
+                return true
+            }
+        }
+
+        return false
     }
 }
 
@@ -673,7 +735,7 @@ struct DateRange {
 
 // MARK: - API Routes
 
-func setupRoutes(_ app: Application, _ dbManager: DatabaseManager) throws {
+func setupRoutes(_ app: Application, _ dbManager: DatabaseManager, _: ConfigManager) throws {
     // GET /history?range=1h&limit=100
     app.get("history") { req -> HistoryResponse in
         let limit = try? req.query.get(Int.self, at: "limit")
@@ -941,7 +1003,7 @@ class ClipboardMonitor: @unchecked Sendable {
         logger.notice("Private mode disabled - clipboard monitoring resumed")
     }
 
-    func startMonitoring() {
+    func startMonitoring(configManager: ConfigManager) {
         // Start polling the pasteboard
         while true {
             autoreleasepool {
@@ -974,6 +1036,15 @@ class ClipboardMonitor: @unchecked Sendable {
                     // Only process if content has actually changed
                     if clipboardString != lastContent {
                         lastContent = clipboardString
+
+                        // Check if content should be filtered based on regex patterns
+                        if configManager.config.filter,
+                           configManager.shouldFilter(clipboardString)
+                        {
+                            logger.notice("Content matched filter pattern")
+                            return
+                        }
+
                         let entry = ClipboardEntry(
                             id: nil,
                             content: clipboardString,
@@ -1136,7 +1207,7 @@ struct Kopya: AsyncParsableCommand {
         // Store the clipboard monitor in the application storage for access in routes
         app.storage[ClipboardMonitorKey.self] = clipboardMonitor
 
-        try setupRoutes(app, dbManager)
+        try setupRoutes(app, dbManager, configManager)
 
         // Start the Vapor server in a background task
         Task {
@@ -1144,7 +1215,7 @@ struct Kopya: AsyncParsableCommand {
         }
 
         // Start monitoring clipboard in the main thread
-        clipboardMonitor.startMonitoring()
+        clipboardMonitor.startMonitoring(configManager: configManager)
     }
 
     // Function to sync run-at-login setting with config
