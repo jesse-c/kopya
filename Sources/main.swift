@@ -1122,8 +1122,10 @@ struct Kopya: AsyncParsableCommand {
 
         let app = try await Application.make(env)
 
-        // Set the port in the application configuration
         app.http.server.configuration.port = port
+        app.http.server.configuration.serverName = "kopya"
+        app.http.server.configuration.backlog = 256
+        app.http.server.configuration.reuseAddress = false
 
         // Create clipboard monitor
         let clipboardMonitor = try ClipboardMonitor(
