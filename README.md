@@ -62,7 +62,7 @@ Kopya supports filtering clipboard content based on Swift's native Regex pattern
 
 ## Install
 
-Use `$ just release install` or download a [release](https://github.com/jesse-c/kopya/releases/latest).
+Use `$ just version release install` or download a [release](https://github.com/jesse-c/kopya/releases/latest).
 
 ## Clients
 

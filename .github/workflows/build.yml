@@ -1,0 +1,53 @@
+name: Build
+
+permissions:
+  contents: write
+
+on:
+  workflow_run:
+    workflows: ["Version"]
+    branches: [main]
+    types:
+      - completed
+
+jobs:
+  build:
+    name: Build
+    runs-on: macos-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set-up Swift
+        uses: swift-actions/setup-swift@v2
+        with:
+          swift-version: '6.0'
+
+      - name: Set-up Just
+        uses: extractions/setup-just@v3
+
+      - name: "Download artifacts"
+        uses: actions/download-artifact@v4
+        with:
+          run-id: ${{ github.event.workflow_run.id }}
+
+      - name: List artifacts
+        run: ls -R .
+
+      - name: Move version
+        run:
+          mv artifacts/Sources/Version.swift Sources/Version.swift
+
+      - name: Build
+        run: just release
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          overwrite: true
+          path: |
+            GITHUB_CHANGELOG.md
+            version
+            .build/release/kopya
