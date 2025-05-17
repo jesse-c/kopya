@@ -4,9 +4,7 @@ permissions:
   contents: write
 
 on:
-  push:
-    tags:
-      - 'v*.*.*'
+  workflow_dispatch:
 
 jobs:
   build-release:
@@ -15,6 +13,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Set-up Swift
         uses: swift-actions/setup-swift@v2
@@ -24,8 +24,16 @@ jobs:
       - name: Set-up Just
         uses: extractions/setup-just@v3
 
-      - name: Version
-        run: just version
+      - name: Bump version
+        id: release
+        uses: cocogitto/cocogitto-action@v3
+        with:
+          release: true
+          git-user: '${{ github.actor }}'
+          git-user-email: '${{ github.actor }}@users.noreply.github.com'
+
+      - name: Place version for build
+        run: just version '${{ steps.release.outputs.version }}'
 
       - name: Build
         run: |
@@ -33,9 +41,9 @@ jobs:
           mkdir artifacts
           cp .build/release/kopya artifacts/kopya
 
-      - name: Extract version from tag
-        id: get_version
-        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+      - name: Generate changelog
+        run: cog changelog --at ${{ steps.release.outputs.version }} -t full_hash > GITHUB_CHANGELOG.md
+
 
       - name: Create release
         id: create_release
@@ -43,6 +51,6 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          name: v${{ steps.get_version.outputs.VERSION }}
-          generate_release_notes: true
+          body_path: GITHUB_CHANGELOG.md
+          tag_name: ${{ steps.release.outputs.version }}
           files: artifacts/kopya

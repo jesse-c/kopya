@@ -9,12 +9,15 @@ default:
 run *ARGS:
     ./.build/debug/kopya {{ARGS}}
 
-# Generate version information from git tag or commit SHA
-version:
+# Generate version information from Git tag or commit SHA, or use provided version argument
+# Example: just version v1.2.3
+version VERSION="":
     #!/usr/bin/env bash
     set -e
-    # Get version from git tag or commit hash
-    if git describe --tags --exact-match 2>/dev/null; then
+    # Use provided VERSION if it exists, otherwise get from git
+    if [ -n "{{VERSION}}" ]; then
+        VERSION="{{VERSION}}"
+    elif git describe --tags --exact-match 2>/dev/null; then
         VERSION=$(git describe --tags 2>/dev/null)
     else
         COMMIT=$(git rev-parse --short HEAD 2>/dev/null)
