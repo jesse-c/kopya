@@ -1,0 +1,47 @@
+name: Version
+
+permissions:
+  contents: write
+
+on:
+  workflow_dispatch:
+
+jobs:
+  version:
+    name: Version
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set-up Just
+        uses: extractions/setup-just@v3
+
+      - name: Bump version
+        id: release
+        uses: cocogitto/cocogitto-action@v3
+        with:
+          release: true
+          git-user: '${{ github.actor }}'
+          git-user-email: '${{ github.actor }}@users.noreply.github.com'
+
+      - name: Place version for later workflows
+        run: echo "${{ steps.release.outputs.version }}" > version
+
+      - name: Place version for build
+        run: just version '${{ steps.release.outputs.version }}'
+
+      - name: Generate changelog
+        run: cog changelog --at ${{ steps.release.outputs.version }} -t full_hash > GITHUB_CHANGELOG.md
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          overwrite: true
+          name: version
+          path: |
+            GITHUB_CHANGELOG.md
+            version
+            Sources/Version.swift
