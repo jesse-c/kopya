@@ -1,0 +1,125 @@
+name: CD
+
+permissions:
+  contents: write
+
+on:
+  workflow_dispatch:
+
+jobs:
+  version:
+    name: Version
+    runs-on: ubuntu-latest
+    outputs:
+      artifact-id: ${{ steps.upload.outputs.artifact-ids }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set-up Just
+        uses: extractions/setup-just@v3
+
+      - name: Bump version
+        id: release
+        uses: cocogitto/cocogitto-action@v3
+        with:
+          release: true
+          git-user: '${{ github.actor }}'
+          git-user-email: '${{ github.actor }}@users.noreply.github.com'
+
+      - name: Place version for later workflows
+        run: echo "${{ steps.release.outputs.version }}" > version
+
+      - name: Place version for build
+        run: just version '${{ steps.release.outputs.version }}'
+
+      - name: Generate changelog
+        run: cog changelog --at ${{ steps.release.outputs.version }} -t full_hash > GITHUB_CHANGELOG.md
+
+      - name: Upload artifacts
+        id: upload
+        uses: actions/upload-artifact@v4
+        with:
+          overwrite: true
+          name: version
+          path: |
+            GITHUB_CHANGELOG.md
+            version
+            Sources/Version.swift
+
+  build:
+    name: Build
+    runs-on: macos-latest
+    needs: version
+    outputs:
+      artifact-id: ${{ steps.upload.outputs.artifact-ids }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set-up Swift
+        uses: swift-actions/setup-swift@v2
+        with:
+          swift-version: '6.0'
+
+      - name: Set-up Just
+        uses: extractions/setup-just@v3
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: version
+          artifact-ids: ${{ needs.version.outputs.artifact-id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build
+        run: just release
+
+      - name: Find binary
+        run: cp ./.build/release/kopya kopya
+
+      - name: Upload artifacts
+        id: upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: build
+          overwrite: true
+          path: |
+            GITHUB_CHANGELOG.md
+            version
+            kopya
+
+  release:
+    name: Release
+    runs-on: ubuntu-latest
+    needs: build
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set-up Just
+        uses: extractions/setup-just@v3
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: build
+          artifact-ids: ${{ needs.version.outputs.artifact-id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Get version
+        id: get_version
+        run: echo "VERSION=$(cat version)" >> $GITHUB_OUTPUT
+
+      - name: Create release
+        id: create_release
+        uses: softprops/action-gh-release@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          name: ${{ steps.get_version.outputs.VERSION }}
+          body_path: GITHUB_CHANGELOG.md
+          tag_name: ${{ steps.get_version.outputs.VERSION }}
+          files: kopya
