@@ -292,8 +292,10 @@ class DatabaseManager: @unchecked Sendable {
     }
 
     func searchEntries(
-        type: String? = nil, query: String? = nil, startDate: Date? = nil, endDate: Date? = nil,
-        limit: Int? = nil
+        type: String? = nil,
+        query: String? = nil,
+        startDate: Date? = nil, endDate: Date? = nil,
+        limit: Int? = nil, offset: Int? = nil
     ) throws -> [ClipboardEntry] {
         try dbQueue.read { db in
             var sql = "SELECT * FROM clipboard_entries"
@@ -339,16 +341,22 @@ class DatabaseManager: @unchecked Sendable {
             if let limit {
                 sql += " LIMIT ?"
                 arguments.append(limit)
+
+                if let offset {
+                    sql += " OFFSET ?"
+                    arguments.append(offset)
+                }
             }
+            // Note: offset without limit is ignored for proper pagination semantics
 
             return try ClipboardEntry.fetchAll(db, sql: sql, arguments: StatementArguments(arguments))
         }
     }
 
-    func getRecentEntries(limit: Int? = nil, startDate: Date? = nil, endDate: Date? = nil) throws
+    func getRecentEntries(limit: Int? = nil, offset: Int? = nil, startDate: Date? = nil, endDate: Date? = nil) throws
         -> [ClipboardEntry]
     {
-        try searchEntries(startDate: startDate, endDate: endDate, limit: limit)
+        try searchEntries(startDate: startDate, endDate: endDate, limit: limit, offset: offset)
     }
 
     func getEntryCount() throws -> Int {
@@ -736,10 +744,17 @@ struct DateRange {
 // MARK: - API Routes
 
 func setupRoutes(_ app: Application, _ dbManager: DatabaseManager, _: ConfigManager) throws {
-    // GET /history?range=1h&limit=100
+    // GET /history?range=1h&limit=100&offset=10
+    // Note: offset parameter requires limit parameter for proper pagination semantics
     app.get("history") { req -> HistoryResponse in
         let limit = try? req.query.get(Int.self, at: "limit")
+        let offset = try? req.query.get(Int.self, at: "offset")
         let range = try? req.query.get(String.self, at: "range")
+
+        // Validate that offset is not provided without limit
+        if offset != nil, limit == nil {
+            throw Abort(.badRequest, reason: "The 'offset' parameter requires 'limit' parameter for proper pagination")
+        }
 
         // Handle date range
         var startDate: Date?
@@ -755,11 +770,12 @@ func setupRoutes(_ app: Application, _ dbManager: DatabaseManager, _: ConfigMana
 
         let entries = try dbManager.getRecentEntries(
             limit: limit,
+            offset: offset,
             startDate: startDate,
             endDate: endDate
         )
 
-        // Get total count separately to ensure accurate count even with limit
+        // Get total count separately to ensure accurate count even with limit (and offset)
         let totalCount = try dbManager.getEntryCount()
 
         return HistoryResponse(entries: entries.map(ClipboardEntryResponse.init), total: totalCount)
