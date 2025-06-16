@@ -221,12 +221,20 @@ class DatabaseManager: @unchecked Sendable {
         }
     }
 
-    private func cleanupOldBackups(backupDir: String, maxBackups: Int) {
+    func cleanupOldBackups(backupDir: String, maxBackups: Int) {
         do {
             let fileManager = FileManager.default
             let backupFiles = try fileManager.contentsOfDirectory(atPath: backupDir)
                 .filter { $0.hasSuffix(".bak") }
-                .sorted()
+                .map { (name: $0, path: "\(backupDir)/\($0)") }
+                .sorted {
+                    let attr1 = try fileManager.attributesOfItem(atPath: $0.path)
+                    let attr2 = try fileManager.attributesOfItem(atPath: $1.path)
+                    let date1 = attr1[.creationDate] as? Date ?? Date.distantPast
+                    let date2 = attr2[.creationDate] as? Date ?? Date.distantPast
+                    return date1 < date2
+                }
+                .map(\.name)
 
             if backupFiles.count > maxBackups {
                 // Delete oldest backups
