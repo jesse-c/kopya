@@ -4,6 +4,9 @@ included:
   - Scripts
   - Tests
 
+disabled_rules:
+  - trailing_comma
+
 file_length:
   warning: 500
   error: 1200

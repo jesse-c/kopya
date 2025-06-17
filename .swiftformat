@@ -1,0 +1,19 @@
+# SwiftFormat configuration
+# Align with SwiftLint opening brace spacing rules
+
+# Keep opening braces on the same line as declarations
+--allman false
+
+# Don't wrap single-line conditional statements  
+--guardelse same-line
+--elseposition same-line
+
+# Standard formatting rules (match existing codebase)
+--indent 4
+--tabwidth 4
+--maxwidth 120
+--linebreaks lf
+--semicolons never
+
+# Disable rules that conflict with our manual brace fixes
+--disable wrapMultilineStatementBraces

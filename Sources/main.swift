@@ -147,19 +147,19 @@ class DatabaseManager: @unchecked Sendable {
         self.maxEntries = maxEntries
 
         // Initialize database schema
-        try dbQueue.write { db in
-            try db.create(table: "clipboard_entries", ifNotExists: true) { t in
-                t.column("id", .text).primaryKey().notNull() // UUID stored as text
-                t.column("content", .text).notNull()
-                t.column("type", .text).notNull()
-                t.column("timestamp", .datetime).notNull()
-                t.uniqueKey(["content"]) // Ensure content is unique
+        try dbQueue.write { database in
+            try database.create(table: "clipboard_entries", ifNotExists: true) { table in
+                table.column("id", .text).primaryKey().notNull() // UUID stored as text
+                table.column("content", .text).notNull()
+                table.column("type", .text).notNull()
+                table.column("timestamp", .datetime).notNull()
+                table.uniqueKey(["content"]) // Ensure content is unique
             }
         }
 
         // Clean up duplicate entries on startup
-        try dbQueue.write { db in
-            try db.execute(
+        try dbQueue.write { database in
+            try database.execute(
                 sql: """
                 DELETE FROM clipboard_entries
                 WHERE id NOT IN (
@@ -167,7 +167,8 @@ class DatabaseManager: @unchecked Sendable {
                     FROM clipboard_entries
                     GROUP BY content
                 )
-                """)
+                """
+            )
         }
 
         // Setup backup timer if enabled
@@ -238,8 +239,8 @@ class DatabaseManager: @unchecked Sendable {
 
             if backupFiles.count > maxBackups {
                 // Delete oldest backups
-                for i in 0 ..< (backupFiles.count - maxBackups) {
-                    let fileToDelete = "\(backupDir)/\(backupFiles[i])"
+                for index in 0 ..< (backupFiles.count - maxBackups) {
+                    let fileToDelete = "\(backupDir)/\(backupFiles[index])"
                     try fileManager.removeItem(atPath: fileToDelete)
                     logger.info("Deleted old backup: \(fileToDelete)")
                 }
@@ -250,11 +251,11 @@ class DatabaseManager: @unchecked Sendable {
     }
 
     func saveEntry(_ entry: ClipboardEntry) throws -> Bool {
-        try dbQueue.write { db in
+        try dbQueue.write { database in
             // Check if content already exists
             let existingCount =
                 try Int.fetchOne(
-                    db, sql: "SELECT COUNT(*) FROM clipboard_entries WHERE content = ?",
+                    database, sql: "SELECT COUNT(*) FROM clipboard_entries WHERE content = ?",
                     arguments: [entry.content]
                 ) ?? 0
 
@@ -264,12 +265,12 @@ class DatabaseManager: @unchecked Sendable {
                 if entry.id == nil {
                     entry.id = UUID()
                 }
-                try entry.insert(db)
+                try entry.insert(database)
 
                 // Clean up old entries if we exceed the limit
-                let totalCount = try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM clipboard_entries") ?? 0
+                let totalCount = try Int.fetchOne(database, sql: "SELECT COUNT(*) FROM clipboard_entries") ?? 0
                 if totalCount > maxEntries {
-                    try db.execute(
+                    try database.execute(
                         sql: """
                         DELETE FROM clipboard_entries
                         WHERE id NOT IN (
@@ -285,7 +286,7 @@ class DatabaseManager: @unchecked Sendable {
                 return true
             } else {
                 // Update timestamp of existing entry to mark it as most recent
-                try db.execute(
+                try database.execute(
                     sql: """
                     UPDATE clipboard_entries
                     SET timestamp = ?
@@ -305,7 +306,7 @@ class DatabaseManager: @unchecked Sendable {
         startDate: Date? = nil, endDate: Date? = nil,
         limit: Int? = nil, offset: Int? = nil
     ) throws -> [ClipboardEntry] {
-        try dbQueue.read { db in
+        try dbQueue.read { database in
             var sql = "SELECT * FROM clipboard_entries"
             var conditions: [String] = []
             var arguments: [DatabaseValueConvertible] = []
@@ -357,19 +358,18 @@ class DatabaseManager: @unchecked Sendable {
             }
             // Note: offset without limit is ignored for proper pagination semantics
 
-            return try ClipboardEntry.fetchAll(db, sql: sql, arguments: StatementArguments(arguments))
+            return try ClipboardEntry.fetchAll(database, sql: sql, arguments: StatementArguments(arguments))
         }
     }
 
     func getRecentEntries(limit: Int? = nil, offset: Int? = nil, startDate: Date? = nil, endDate: Date? = nil) throws
-        -> [ClipboardEntry]
-    {
+        -> [ClipboardEntry] {
         try searchEntries(startDate: startDate, endDate: endDate, limit: limit, offset: offset)
     }
 
     func getEntryCount() throws -> Int {
-        try dbQueue.read { db in
-            try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM clipboard_entries") ?? 0
+        try dbQueue.read { database in
+            try Int.fetchOne(database, sql: "SELECT COUNT(*) FROM clipboard_entries") ?? 0
         }
     }
 
@@ -383,8 +383,8 @@ class DatabaseManager: @unchecked Sendable {
     ) throws -> (
         deletedCount: Int, remainingCount: Int
     ) {
-        try dbQueue.write { db in
-            let totalCount = try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM clipboard_entries") ?? 0
+        try dbQueue.write { database in
+            let totalCount = try Int.fetchOne(database, sql: "SELECT COUNT(*) FROM clipboard_entries") ?? 0
 
             // Process range parameter if provided
             var effectiveStartDate = startDate
@@ -475,26 +475,26 @@ class DatabaseManager: @unchecked Sendable {
                 sql = "DELETE FROM clipboard_entries"
             }
 
-            try db.execute(sql: sql, arguments: StatementArguments(arguments))
+            try database.execute(sql: sql, arguments: StatementArguments(arguments))
 
-            let remainingCount = try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM clipboard_entries") ?? 0
+            let remainingCount = try Int.fetchOne(database, sql: "SELECT COUNT(*) FROM clipboard_entries") ?? 0
             return (totalCount - remainingCount, remainingCount)
         }
     }
 
     func deleteAllEntries() throws {
-        try dbQueue.write { db in
-            try db.execute(sql: "DELETE FROM clipboard_entries")
+        try dbQueue.write { database in
+            try database.execute(sql: "DELETE FROM clipboard_entries")
         }
     }
 
     func deleteEntryById(_ id: UUID) throws -> Bool {
-        try dbQueue.write { db in
+        try dbQueue.write { database in
             // Check if the entry exists
             let exists =
                 try ClipboardEntry
                     .filter(Column("id") == id.uuidString)
-                    .fetchCount(db) > 0
+                    .fetchCount(database) > 0
 
             guard exists else {
                 return false // Entry not found
@@ -503,7 +503,7 @@ class DatabaseManager: @unchecked Sendable {
             // Delete the entry
             try ClipboardEntry
                 .filter(Column("id") == id.uuidString)
-                .deleteAll(db)
+                .deleteAll(database)
 
             return true // Entry deleted successfully
         }
@@ -550,7 +550,9 @@ class ConfigManager {
                 do {
                     return try Regex(pattern)
                 } catch {
-                    Self.logger.error("Failed to parse filter pattern '\(pattern)' to Regex: \(error.localizedDescription)")
+                    Self.logger.error(
+                        "Failed to parse filter pattern '\(pattern)' to Regex: \(error.localizedDescription)"
+                    )
                     return nil
                 }
             }
@@ -650,7 +652,8 @@ class ConfigManager {
 
         } catch let error as TOMLParseError {
             Self.logger.error(
-                "TOML Parse Error: Line \(error.source.begin.line), Column \(error.source.begin.column)")
+                "TOML Parse Error: Line \(error.source.begin.line), Column \(error.source.begin.column)"
+            )
             throw NSError(
                 domain: "ConfigManager", code: 2,
                 userInfo: [
@@ -676,10 +679,8 @@ class ConfigManager {
         }
 
         // Check if content matches any of the filter patterns
-        for pattern in compiledFilterPatterns {
-            if content.contains(pattern) {
-                return true
-            }
+        for pattern in compiledFilterPatterns where content.contains(pattern) {
+            return true
         }
 
         return false
@@ -716,8 +717,7 @@ struct DateRange {
         // Original implementation for single unit formats
         // Parse number and unit
         guard let number = Int(String(input.dropLast())),
-              let unit = input.last
-        else {
+              let unit = input.last else {
             return nil
         }
 
@@ -852,8 +852,7 @@ func setupRoutes(_ app: Application, _ dbManager: DatabaseManager, _: ConfigMana
     // DELETE /history/:id
     app.delete("history", ":id") { req -> Response in
         guard let idString = req.parameters.get("id"),
-              let id = UUID(uuidString: idString)
-        else {
+              let id = UUID(uuidString: idString) else {
             throw Abort(.badRequest, reason: "Invalid UUID format")
         }
 
@@ -1055,16 +1054,14 @@ class ClipboardMonitor: @unchecked Sendable {
                 }
 
                 if let (type, rawType) = availableType,
-                   let clipboardString = getString(for: type, rawType: rawType)
-                {
+                   let clipboardString = getString(for: type, rawType: rawType) {
                     // Only process if content has actually changed
                     if clipboardString != lastContent {
                         lastContent = clipboardString
 
                         // Check if content should be filtered based on regex patterns
                         if configManager.config.filter,
-                           configManager.shouldFilter(clipboardString)
-                        {
+                           configManager.shouldFilter(clipboardString) {
                             logger.notice("Content matched filter pattern")
                             return
                         }
@@ -1121,8 +1118,7 @@ class ClipboardMonitor: @unchecked Sendable {
             }
             // Then try string type for URLs
             if let text = pasteboard.string(forType: .string),
-               text.lowercased().hasPrefix("http")
-            {
+               text.lowercased().hasPrefix("http") {
                 return text
             }
             return nil

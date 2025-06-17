@@ -42,10 +42,10 @@ final class DatabaseManagerTests: XCTestCase {
 
     func testMaxEntriesLimit() throws {
         // Add more than max entries
-        for i in 1 ... 10 {
+        for index in 1 ... 10 {
             let entry = ClipboardEntry(
                 id: nil,
-                content: "Content \(i)",
+                content: "Content \(index)",
                 type: "public.utf8-plain-text",
                 timestamp: Date()
             )
@@ -334,8 +334,7 @@ final class DatabaseManagerTests: XCTestCase {
 
         // Find entry2 by its unique content
         guard let entryToDelete = allEntries.first(where: { $0.content == "Unique Entry 2 for deletion test" }),
-              let idToDelete = entryToDelete.id
-        else {
+              let idToDelete = entryToDelete.id else {
             XCTFail("Could not find entry to delete or it has no ID")
             return
         }
@@ -379,15 +378,15 @@ final class DatabaseManagerTests: XCTestCase {
         let calendar = Calendar.current
 
         // Create 10 backup files with different timestamps
-        for i in 1 ... 10 {
-            let fileName = "history_backup_\(String(format: "%02d", i)).bak"
+        for index in 1 ... 10 {
+            let fileName = "history_backup_\(String(format: "%02d", index)).bak"
             let filePath = backupDir.appendingPathComponent(fileName)
 
             // Create file with mock content
-            try "mock backup content \(i)".write(to: filePath, atomically: true, encoding: .utf8)
+            try "mock backup content \(index)".write(to: filePath, atomically: true, encoding: .utf8)
 
             // Set creation date (older files first)
-            let fileDate = calendar.date(byAdding: .hour, value: -(10 - i), to: baseDate)!
+            let fileDate = calendar.date(byAdding: .hour, value: -(10 - index), to: baseDate)!
             try fileManager.setAttributes([.creationDate: fileDate], ofItemAtPath: filePath.path)
         }
 
@@ -438,10 +437,10 @@ final class DatabaseManagerTests: XCTestCase {
         let fileManager = FileManager.default
 
         // Create exactly 3 backup files
-        for i in 1 ... 3 {
-            let fileName = "history_backup_\(i).bak"
+        for index in 1 ... 3 {
+            let fileName = "history_backup_\(index).bak"
             let filePath = backupDir.appendingPathComponent(fileName)
-            try "mock backup content \(i)".write(to: filePath, atomically: true, encoding: .utf8)
+            try "mock backup content \(index)".write(to: filePath, atomically: true, encoding: .utf8)
         }
 
         // Verify we have 3 files
@@ -476,10 +475,10 @@ final class DatabaseManagerTests: XCTestCase {
         let fileManager = FileManager.default
 
         // Create only 2 backup files
-        for i in 1 ... 2 {
-            let fileName = "history_backup_\(i).bak"
+        for index in 1 ... 2 {
+            let fileName = "history_backup_\(index).bak"
             let filePath = backupDir.appendingPathComponent(fileName)
-            try "mock backup content \(i)".write(to: filePath, atomically: true, encoding: .utf8)
+            try "mock backup content \(index)".write(to: filePath, atomically: true, encoding: .utf8)
         }
 
         // Verify we have 2 files
@@ -554,21 +553,21 @@ final class DatabaseManagerTests: XCTestCase {
         let calendar = Calendar.current
 
         // Create 5 backup files and 3 non-backup files
-        for i in 1 ... 5 {
-            let fileName = "history_backup_\(i).bak"
+        for index in 1 ... 5 {
+            let fileName = "history_backup_\(index).bak"
             let filePath = backupDir.appendingPathComponent(fileName)
-            try "backup content \(i)".write(to: filePath, atomically: true, encoding: .utf8)
+            try "backup content \(index)".write(to: filePath, atomically: true, encoding: .utf8)
 
             // Set creation date
-            let fileDate = calendar.date(byAdding: .minute, value: -i, to: baseDate)!
+            let fileDate = calendar.date(byAdding: .minute, value: -index, to: baseDate)!
             try fileManager.setAttributes([.creationDate: fileDate], ofItemAtPath: filePath.path)
         }
 
         // Create non-backup files
-        for i in 1 ... 3 {
-            let fileName = "other_file_\(i).txt"
+        for index in 1 ... 3 {
+            let fileName = "other_file_\(index).txt"
             let filePath = backupDir.appendingPathComponent(fileName)
-            try "other content \(i)".write(to: filePath, atomically: true, encoding: .utf8)
+            try "other content \(index)".write(to: filePath, atomically: true, encoding: .utf8)
         }
 
         // Verify initial state

@@ -324,10 +324,10 @@ final class APITests: XCTestCase {
         (dbManager, dbPath) = try createTestDatabase()
 
         // Add test entries
-        for i in 1 ... 5 {
+        for index in 1 ... 5 {
             let entry = ClipboardEntry(
                 id: nil,
-                content: "Content \(i)",
+                content: "Content \(index)",
                 type: "public.utf8-plain-text",
                 timestamp: Date()
             )
@@ -578,8 +578,7 @@ final class APITests: XCTestCase {
 
         // Find the entry with the content "Entry to delete"
         guard let entryToDelete = entries.first(where: { $0.content == "Entry to delete" }),
-              let idToDelete = entryToDelete.id
-        else {
+              let idToDelete = entryToDelete.id else {
             XCTFail("Could not find entry to delete or it has no ID")
             return
         }
