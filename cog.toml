@@ -19,6 +19,7 @@ tag_prefix = "v"
 [commit_types]
 ci = { changelog_title = "", omit_from_changelog = true }
 cd = { changelog_title = "", omit_from_changelog = true }
+deps = { changelog_title = "", omit_from_changelog = true }
 
 [changelog]
 path = "CHANGELOG.md"
