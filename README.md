@@ -41,7 +41,11 @@ There must be a config file at `$USER/.config/kopya/config.toml`, with contents 
 run-at-login = true
 max-entries = 10000000
 port = 9090
-backup = true
+
+[backup]
+interval = 86400  # 24 hours in seconds (default)
+count = 2         # Number of backups to keep (default)
+
 filter = true
 filters = [
   "password\\w*",

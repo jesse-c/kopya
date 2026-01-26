@@ -43,7 +43,7 @@ final class ClipboardMonitorTests: XCTestCase {
     private func createTestDatabase() throws -> (DatabaseManager, String) {
         let tempDir = FileManager.default.temporaryDirectory
         let dbPath = tempDir.appendingPathComponent("kopya_test_\(UUID().uuidString).db").path
-        let dbManager = try DatabaseManager(databasePath: dbPath, maxEntries: 1000, backupEnabled: false)
+        let dbManager = try DatabaseManager(databasePath: dbPath, maxEntries: 1000)
         return (dbManager, dbPath)
     }
 
@@ -59,7 +59,7 @@ final class ClipboardMonitorTests: XCTestCase {
         (dbManager, dbPath) = try createTestDatabase()
 
         // Create a clipboard monitor
-        let monitor = try ClipboardMonitor(maxEntries: 1000, backupEnabled: false)
+        let monitor = try ClipboardMonitor(maxEntries: 1000)
 
         // Verify initial state
         XCTAssertTrue(monitor.isMonitoring, "Monitoring should be enabled by default")
@@ -71,7 +71,7 @@ final class ClipboardMonitorTests: XCTestCase {
         (dbManager, dbPath) = try createTestDatabase()
 
         // Create a clipboard monitor
-        let monitor = try ClipboardMonitor(maxEntries: 1000, backupEnabled: false)
+        let monitor = try ClipboardMonitor(maxEntries: 1000)
 
         // Enable private mode
         monitor.enablePrivateMode()
@@ -86,7 +86,7 @@ final class ClipboardMonitorTests: XCTestCase {
         (dbManager, dbPath) = try createTestDatabase()
 
         // Create a clipboard monitor
-        let monitor = try ClipboardMonitor(maxEntries: 1000, backupEnabled: false)
+        let monitor = try ClipboardMonitor(maxEntries: 1000)
 
         // Enable private mode first
         monitor.enablePrivateMode()
@@ -105,7 +105,7 @@ final class ClipboardMonitorTests: XCTestCase {
         (dbManager, dbPath) = try createTestDatabase()
 
         // Create a clipboard monitor
-        let monitor = try ClipboardMonitor(maxEntries: 1000, backupEnabled: false)
+        let monitor = try ClipboardMonitor(maxEntries: 1000)
 
         // Enable private mode with a time range
         monitor.enablePrivateMode(timeRange: "1h")
@@ -139,7 +139,7 @@ final class ClipboardMonitorTests: XCTestCase {
         (dbManager, dbPath) = try createTestDatabase()
 
         // Create a clipboard monitor
-        let monitor = try ClipboardMonitor(maxEntries: 1000, backupEnabled: false)
+        let monitor = try ClipboardMonitor(maxEntries: 1000)
 
         // Enable private mode with a time range
         monitor.enablePrivateMode(timeRange: "1h")
@@ -162,7 +162,7 @@ final class ClipboardMonitorTests: XCTestCase {
         (dbManager, dbPath) = try createTestDatabase()
 
         // Create a clipboard monitor
-        let monitor = try ClipboardMonitor(maxEntries: 1000, backupEnabled: false)
+        let monitor = try ClipboardMonitor(maxEntries: 1000)
 
         // Enable private mode with a time range
         monitor.enablePrivateMode(timeRange: "1h")
@@ -183,7 +183,7 @@ final class ClipboardMonitorTests: XCTestCase {
         (dbManager, dbPath) = try createTestDatabase()
 
         // Create a clipboard monitor
-        let monitor = try ClipboardMonitor(maxEntries: 1000, backupEnabled: false)
+        let monitor = try ClipboardMonitor(maxEntries: 1000)
 
         // Enable private mode with an invalid time range
         monitor.enablePrivateMode(timeRange: "invalid")
@@ -198,7 +198,7 @@ final class ClipboardMonitorTests: XCTestCase {
         (dbManager, dbPath) = try createTestDatabase()
 
         // Create a clipboard monitor
-        let monitor = try ClipboardMonitor(maxEntries: 1000, backupEnabled: false)
+        let monitor = try ClipboardMonitor(maxEntries: 1000)
 
         // Simulate a clipboard change
         let initialChangeCount = NSPasteboard.general.changeCount
@@ -221,7 +221,7 @@ final class ClipboardMonitorTests: XCTestCase {
         (dbManager, dbPath) = try createTestDatabase()
 
         // Create a clipboard monitor
-        let monitor = try ClipboardMonitor(maxEntries: 1000, backupEnabled: false)
+        let monitor = try ClipboardMonitor(maxEntries: 1000)
 
         // Simulate a menu bar action to enable private mode
         monitor.enablePrivateMode()

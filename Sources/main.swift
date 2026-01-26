@@ -130,12 +130,12 @@ class DatabaseManager: @unchecked Sendable {
     private let maxEntries: Int
     private let databasePath: String
     private var backupTimer: Timer?
-    private let backupEnabled: Bool
+    private let backupConfig: BackupConfig?
 
-    init(databasePath: String? = nil, maxEntries: Int = 1000, backupEnabled: Bool = false) throws {
+    init(databasePath: String? = nil, maxEntries: Int = 1000, backupConfig: BackupConfig? = nil) throws {
         let path = databasePath ?? "\(NSHomeDirectory())/Library/Application Support/Kopya/history.db"
         self.databasePath = path
-        self.backupEnabled = backupEnabled
+        self.backupConfig = backupConfig
 
         // Ensure directory exists
         try FileManager.default.createDirectory(
@@ -172,7 +172,7 @@ class DatabaseManager: @unchecked Sendable {
         }
 
         // Setup backup timer if enabled
-        if backupEnabled {
+        if backupConfig != nil {
             setupBackupTimer()
         }
     }
@@ -182,8 +182,9 @@ class DatabaseManager: @unchecked Sendable {
     }
 
     private func setupBackupTimer() {
-        // Schedule hourly backups
-        backupTimer = Timer.scheduledTimer(withTimeInterval: 3600, repeats: true) { [weak self] _ in
+        // Schedule backups using the configured interval
+        let interval = TimeInterval(backupConfig?.interval ?? 86400)
+        backupTimer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { [weak self] _ in
             self?.performBackup()
         }
 
@@ -215,8 +216,7 @@ class DatabaseManager: @unchecked Sendable {
 
             logger.info("Database backup created at \(backupPath)")
 
-            // Clean up old backups (keep last 72 backups = 3 days worth)
-            cleanupOldBackups(backupDir: backupDir, maxBackups: 72)
+            cleanupOldBackups(backupDir: backupDir, maxBackups: backupConfig?.count ?? 2)
         } catch {
             logger.error("Failed to create database backup: \(error.localizedDescription)")
         }
@@ -512,11 +512,16 @@ class DatabaseManager: @unchecked Sendable {
 
 // MARK: - Configuration Management
 
+struct BackupConfig: Codable {
+    var interval: Int
+    var count: Int
+}
+
 struct KopyaConfig: Codable {
     var runAtLogin: Bool
     var maxEntries: Int
     var port: Int
-    var backup: Bool
+    var backup: BackupConfig?
     var filter: Bool
     var filters: [String]?
 }
@@ -617,7 +622,29 @@ class ConfigManager {
 
             // Extract and validate backup
             if let backupValue = toml["backup"] {
-                configTable["backup"] = backupValue
+                // If backup is enabled, create a BackupConfig with interval and count
+                if let backupEnabled = backupValue.bool, backupEnabled {
+                    let backupTable = TOMLTable()
+
+                    // Extract backup-interval (optional, defaults to 86400 seconds/24 hours)
+                    if let backupIntervalValue = toml["backup-interval"] {
+                        backupTable["interval"] = backupIntervalValue
+                    } else {
+                        backupTable["interval"] = TOMLValue(86400)
+                        Self.logger.info("Missing 'backup-interval' in config, defaulting to 86400 seconds (24 hours).")
+                    }
+
+                    // Extract backup-count (optional, defaults to 2)
+                    if let backupCountValue = toml["backup-count"] {
+                        backupTable["count"] = backupCountValue
+                    } else {
+                        backupTable["count"] = TOMLValue(2)
+                        Self.logger.info("Missing 'backup-count' in config, defaulting to 2.")
+                    }
+
+                    configTable["backup"] = backupTable
+                }
+                // If backup is disabled, don't add 'backup' field to the table at all
             } else {
                 Self.logger.error("Missing 'backup' in config")
                 throw NSError(
@@ -967,8 +994,8 @@ class ClipboardMonitor: @unchecked Sendable {
         (.tiff, "public.tiff"),
     ]
 
-    init(maxEntries: Int = 1000, backupEnabled: Bool = false) throws {
-        dbManager = try DatabaseManager(maxEntries: maxEntries, backupEnabled: backupEnabled)
+    init(maxEntries: Int = 1000, backupConfig: BackupConfig? = nil) throws {
+        dbManager = try DatabaseManager(maxEntries: maxEntries, backupConfig: backupConfig)
         lastChangeCount = NSPasteboard.general.changeCount
         isMonitoring = true
 
@@ -1203,8 +1230,16 @@ struct Kopya: AsyncParsableCommand {
         signal(SIGINT, SIG_IGN)
         signal(SIGTERM, SIG_IGN)
 
+        // Create database manager
         let dbManager = try DatabaseManager(
-            maxEntries: maxEntries, backupEnabled: configManager.config.backup
+            maxEntries: maxEntries,
+            backupConfig: configManager.config.backup
+        )
+
+        // Create clipboard monitor
+        let clipboardMonitor = try ClipboardMonitor(
+            maxEntries: maxEntries,
+            backupConfig: configManager.config.backup
         )
 
         // Configure and start Vapor server
@@ -1217,12 +1252,6 @@ struct Kopya: AsyncParsableCommand {
         app.http.server.configuration.serverName = "kopya"
         app.http.server.configuration.backlog = 256
         app.http.server.configuration.reuseAddress = false
-
-        // Create clipboard monitor
-        let clipboardMonitor = try ClipboardMonitor(
-            maxEntries: maxEntries,
-            backupEnabled: configManager.config.backup
-        )
 
         // Store the clipboard monitor in the application storage for access in routes
         app.storage[ClipboardMonitorKey.self] = clipboardMonitor

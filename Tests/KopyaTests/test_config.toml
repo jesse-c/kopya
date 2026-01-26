@@ -2,5 +2,7 @@ run-at-login = false
 max-entries = 1000
 port = 8080
 backup = false
+# backup-interval = 86400  # 24 hours in seconds (default)
+# backup-count = 2          # Number of backups to keep (default)
 filter = false
 filters = []

@@ -11,7 +11,7 @@ final class DatabaseManagerTests: XCTestCase {
         // Create a temporary database for testing
         let tempDir = FileManager.default.temporaryDirectory
         dbPath = tempDir.appendingPathComponent("kopya_test_\(UUID().uuidString).db").path
-        dbManager = try DatabaseManager(databasePath: dbPath, maxEntries: testMaxEntries, backupEnabled: false)
+        dbManager = try DatabaseManager(databasePath: dbPath, maxEntries: testMaxEntries)
     }
 
     override func tearDown() async throws {
@@ -397,7 +397,7 @@ final class DatabaseManagerTests: XCTestCase {
 
         // Create a database manager
         let tempDbPath = backupDir.appendingPathComponent("test.db").path
-        let dbManager = try DatabaseManager(databasePath: tempDbPath, maxEntries: 100, backupEnabled: false)
+        let dbManager = try DatabaseManager(databasePath: tempDbPath, maxEntries: 100)
 
         // Test cleanup logic with max 5 backups - this should delete 5 oldest files
         dbManager.cleanupOldBackups(backupDir: backupDir.path, maxBackups: 5)
@@ -450,7 +450,7 @@ final class DatabaseManagerTests: XCTestCase {
 
         // Create a database manager
         let tempDbPath = backupDir.appendingPathComponent("test.db").path
-        let dbManager = try DatabaseManager(databasePath: tempDbPath, maxEntries: 100, backupEnabled: false)
+        let dbManager = try DatabaseManager(databasePath: tempDbPath, maxEntries: 100)
 
         // Test cleanup with max 3 backups - should not delete any files
         dbManager.cleanupOldBackups(backupDir: backupDir.path, maxBackups: 3)
@@ -488,7 +488,7 @@ final class DatabaseManagerTests: XCTestCase {
 
         // Create a database manager
         let tempDbPath = backupDir.appendingPathComponent("test.db").path
-        let dbManager = try DatabaseManager(databasePath: tempDbPath, maxEntries: 100, backupEnabled: false)
+        let dbManager = try DatabaseManager(databasePath: tempDbPath, maxEntries: 100)
 
         // Test cleanup with max 5 backups - should not delete any files
         dbManager.cleanupOldBackups(backupDir: backupDir.path, maxBackups: 5)
@@ -523,7 +523,7 @@ final class DatabaseManagerTests: XCTestCase {
 
         // Create a database manager
         let tempDbPath = backupDir.appendingPathComponent("test.db").path
-        let dbManager = try DatabaseManager(databasePath: tempDbPath, maxEntries: 100, backupEnabled: false)
+        let dbManager = try DatabaseManager(databasePath: tempDbPath, maxEntries: 100)
 
         // Test cleanup - should not throw error or affect non-backup files
         dbManager.cleanupOldBackups(backupDir: backupDir.path, maxBackups: 3)
@@ -581,7 +581,7 @@ final class DatabaseManagerTests: XCTestCase {
 
         // Create a database manager
         let tempDbPath = backupDir.appendingPathComponent("test.db").path
-        let dbManager = try DatabaseManager(databasePath: tempDbPath, maxEntries: 100, backupEnabled: false)
+        let dbManager = try DatabaseManager(databasePath: tempDbPath, maxEntries: 100)
 
         // Test cleanup with max 2 backups - should delete 3 oldest backup files
         dbManager.cleanupOldBackups(backupDir: backupDir.path, maxBackups: 2)

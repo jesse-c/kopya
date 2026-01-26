@@ -18,7 +18,7 @@ final class APITests: XCTestCase {
     private func createTestDatabase() throws -> (DatabaseManager, String) {
         let tempDir = FileManager.default.temporaryDirectory
         let dbPath = tempDir.appendingPathComponent("kopya_test_\(UUID().uuidString).db").path
-        let dbManager = try DatabaseManager(databasePath: dbPath, maxEntries: 1000, backupEnabled: false)
+        let dbManager = try DatabaseManager(databasePath: dbPath, maxEntries: 1000)
         return (dbManager, dbPath)
     }
 
@@ -638,7 +638,7 @@ final class APITests: XCTestCase {
         (dbManager, dbPath) = try createTestDatabase()
 
         // Create a clipboard monitor for testing
-        let clipboardMonitor = try ClipboardMonitor(maxEntries: 1000, backupEnabled: false)
+        let clipboardMonitor = try ClipboardMonitor(maxEntries: 1000)
 
         // Store the monitor in the application storage
         app.storage[ClipboardMonitorKey.self] = clipboardMonitor
