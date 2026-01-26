@@ -1,0 +1,27 @@
+version: 2
+updates:
+  # Swift Package Manager dependencies
+  - package-ecosystem: "swift"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "Europe/London"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "swift"
+    commit-message:
+      prefix: "deps"
+      prefix-development: "build"
+      include: "scope"
+    groups:
+      # Group all non-major updates together
+      all-minor-patch:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
+    rebase-strategy: "auto"
