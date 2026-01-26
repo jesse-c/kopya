@@ -1,6 +1,8 @@
 # Koypa
 
 Sources/Version.swift
+build/
+*.app
 
 # Xcode
 #
