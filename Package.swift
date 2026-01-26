@@ -12,7 +12,7 @@ let package = Package(
         .executable(name: "kopya", targets: ["Kopya"]),
     ],
     dependencies: [
-        .package(url: "https://github.com/groue/GRDB.swift.git", from: "6.21.0"),
+        .package(url: "https://github.com/groue/GRDB.swift.git", from: "7.9.0"),
         .package(url: "https://github.com/vapor/vapor.git", from: "4.89.0"),
         .package(url: "https://github.com/apple/swift-argument-parser.git", from: "1.2.0"),
         .package(url: "https://github.com/LebJe/TOMLKit.git", from: "0.5.0"),
