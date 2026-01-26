@@ -74,11 +74,25 @@ jobs:
           artifact-ids: ${{ needs.version.outputs.artifact-id }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build
-        run: just release
+      - name: Build CLI binary
+        run: just build-cli
 
-      - name: Find binary
+      - name: Build .app bundle
+        run: just build-app
+
+      - name: Verify .app build
+        run: |
+          test -d build/Kopya.app
+          test -f build/Kopya.app/Contents/MacOS/kopya
+          codesign -dv build/Kopya.app
+
+      - name: Find CLI binary
         run: cp ./.build/release/kopya kopya
+
+      - name: Create release archive
+        run: |
+          cd build
+          zip -r Kopya.app.zip Kopya.app
 
       - name: Upload artifacts
         id: upload
@@ -90,6 +104,7 @@ jobs:
             GITHUB_CHANGELOG.md
             version
             kopya
+            build/Kopya.app.zip
 
   release:
     name: Release
@@ -122,4 +137,6 @@ jobs:
           name: ${{ steps.get_version.outputs.VERSION }}
           body_path: GITHUB_CHANGELOG.md
           tag_name: ${{ steps.get_version.outputs.VERSION }}
-          files: kopya
+          files: |
+            kopya
+            build/Kopya.app.zip

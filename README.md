@@ -30,7 +30,7 @@ You can read my introductory blog post[^2].
 - Limit how many are stored, with a rolling clean-up window
 - Private Mode: Disable clipboard monitoring, and optionally re-enable after a set time, or at and end time
 - Content filtering: Skip storing sensitive data matching regex patterns
-- Optional: Run at login
+- Run at login (when installed as .app bundle)
 - Optional: Backup hourly
 
 ## Config
@@ -66,7 +66,56 @@ Kopya supports filtering clipboard content based on Swift's native Regex pattern
 
 ## Install
 
-Use `$ just version release install` or download a [release](https://github.com/jesse-c/kopya/releases/latest).
+### Via .app Bundle (Recommended)
+
+1. Download `Kopya.app.zip` from [releases](https://github.com/jesse-c/kopya/releases/latest)
+2. Unzip and drag `Kopya.app` to `/Applications/`
+3. Launch Kopya.app (double-click or `open /Applications/Kopya.app`)
+4. Create config file at `~/.config/kopya/config.toml` (see [Config](#config))
+
+The app runs in the background (no Dock icon). Set `run-at-login = true` in config to start automatically at login.
+
+**CLI Access (Optional)**
+
+For command-line access, create a symlink:
+
+```bash
+ln -s /Applications/Kopya.app/Contents/MacOS/kopya /usr/local/bin/kopya
+```
+
+Or use the `just` command:
+
+```bash
+just link-cli
+```
+
+### Building from Source
+
+#### .app
+
+```bash
+# Build .app bundle
+just build-app
+
+# Install to /Applications
+just install-app
+
+# Optional: Create CLI symlink from installed .app
+just link-cli
+```
+
+#### CLI-only (Legacy)
+
+```bash
+# Build CLI binary
+just build-cli
+
+# Install to ~/.local/bin
+just install-cli
+```
+
+> [!NOTE]
+> `run-at-login` requires the .app bundle.
 
 ## Clients
 
