@@ -21,9 +21,6 @@ jobs:
       - name: Set-up Just
         uses: extractions/setup-just@v3
 
-      - name: Check conventional commits
-        uses: cocogitto/cocogitto-action@v3
-
       - name: Bump version
         id: release
         uses: cocogitto/cocogitto-action@v3
