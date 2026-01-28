@@ -7,6 +7,7 @@
   - [Regex Filtering](#regex-filtering)
 - [Install](#install)
 - [Clients](#clients)
+- [Releasing](#releasing)
 <!--toc:end-->
 
 ---
@@ -121,6 +122,63 @@ just install-cli
 
 - Raycast extension: [WIP](https://github.com/jesse-c/extensions/tree/feat/add-kopya/extensions/kopya)
 - Emacs package: [WIP](https://github.com/jesse-c/dotfiles/blob/main/home/dot_config/emacs/user/kopya.el)
+
+## Releasing
+
+Releases are created using the CD workflow via GitHub Actions:
+
+1. Commit your changes using [conventional commits](https://www.conventionalcommits.org/):
+
+   | Type | Description | Version Bump |
+   |------|-------------|--------------|
+   | `feat` | New feature | MINOR |
+   | `fix` | Bug fix | PATCH |
+   | `refactor` | Code refactoring | none |
+   | `chore` | Maintenance tasks | none |
+   | `docs` | Documentation changes | none |
+   | `ci` | CI/CD changes | none |
+   | `build` | Build system changes | none |
+   | `perf` | Performance improvements | none |
+   | `test` | Test changes | none |
+   | `style` | Code style changes | none |
+
+   Examples:
+   ```
+   feat: add pagination to history endpoint
+   fix: properly remove old backups
+   refactor: group backup config together
+   docs: improve install instructions
+   ```
+
+   For breaking changes, add `!` after the type or add `BREAKING CHANGE:` to the footer:
+   ```
+   feat!: change API endpoint structure
+   feat: remove deprecated endpoint
+
+   BREAKING CHANGE: this removes support for legacy clients
+   ```
+
+   > [!NOTE]
+   > Commit messages are validated in CI on every push and PR. Non-conventional commits will fail the check.
+
+2. Go to Actions → CD workflow in GitHub
+
+3. Click "Run workflow" → Select branch → Click "Run"
+
+   The workflow validates commits since the last release. If validation fails, you'll see an error like:
+   ```
+   Error: Missing commit type separator ':'
+   Errored commit: abc123...
+   Commit message: 'your invalid message'
+   ```
+   Fix the problematic commits and re-run the workflow.
+
+4. The workflow will:
+   - Bump version based on commits (cocogitto)
+   - Generate changelog
+   - Build CLI binary and .app bundle
+   - Create GitHub release with tag
+   - Attach `kopya` and `Kopya.app.zip`
 
 [^1]: https://j-e-s-s-e.com/blog/multi-uis-for-a-daemon-and-using-grpc-to-communicate-locally-from-rust-swift
 [^2]: https://j-e-s-s-e.com/blog/alpha-release-of-kopya
