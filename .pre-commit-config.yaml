@@ -1,0 +1,9 @@
+repos:
+  - repo: local
+    hooks:
+      - id: cog
+        name: Check conventional commits
+        entry: cog check --from-latest-tag
+        language: system
+        pass_filenames: false
+        always_run: true
