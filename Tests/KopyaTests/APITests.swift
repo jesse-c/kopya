@@ -4,7 +4,7 @@ import Vapor
 import XCTest
 import XCTVapor
 
-// Define response structures to match the API
+/// Define response structures to match the API
 struct ErrorResponse: Content {
     let reason: String
 }
@@ -261,10 +261,14 @@ final class APITests: XCTestCase {
         // Add test entries with different types
         let now = Date()
         let calendar = Calendar.current
-        let entries = [
-            ("Old text", "public.utf8-plain-text", calendar.date(byAdding: .hour, value: -2, to: now)!),
-            ("https://test.com", "public.url", calendar.date(byAdding: .minute, value: -30, to: now)!),
-            ("Recent text", "public.utf8-plain-text", calendar.date(byAdding: .minute, value: -5, to: now)!),
+        let entries = try [
+            ("Old text", "public.utf8-plain-text", XCTUnwrap(calendar.date(byAdding: .hour, value: -2, to: now))),
+            ("https://test.com", "public.url", XCTUnwrap(calendar.date(byAdding: .minute, value: -30, to: now))),
+            (
+                "Recent text",
+                "public.utf8-plain-text",
+                XCTUnwrap(calendar.date(byAdding: .minute, value: -5, to: now)),
+            ),
         ]
 
         for (content, type, timestamp) in entries {
@@ -272,7 +276,7 @@ final class APITests: XCTestCase {
                 id: nil,
                 content: content,
                 type: type,
-                timestamp: timestamp
+                timestamp: timestamp,
             )
             _ = try dbManager.saveEntry(entry)
         }
@@ -306,7 +310,7 @@ final class APITests: XCTestCase {
         }
 
         // Test combined filters - use explicit date range instead of relative range
-        let fiveMinutesAgo = calendar.date(byAdding: .minute, value: -10, to: now)!
+        let fiveMinutesAgo = try XCTUnwrap(calendar.date(byAdding: .minute, value: -10, to: now))
         let isoFormatter = ISO8601DateFormatter()
         let startDateString = isoFormatter.string(from: fiveMinutesAgo)
 
@@ -329,7 +333,7 @@ final class APITests: XCTestCase {
                 id: nil,
                 content: "Content \(index)",
                 type: "public.utf8-plain-text",
-                timestamp: Date()
+                timestamp: Date(),
             )
             _ = try dbManager.saveEntry(entry)
         }
@@ -354,12 +358,12 @@ final class APITests: XCTestCase {
         let calendar = Calendar.current
 
         // Add entries with different timestamps
-        let entries = [
-            ("Very old entry", calendar.date(byAdding: .hour, value: -5, to: now)!),
-            ("Old entry", calendar.date(byAdding: .hour, value: -4, to: now)!),
-            ("Medium old entry", calendar.date(byAdding: .hour, value: -3, to: now)!),
-            ("Recent entry", calendar.date(byAdding: .hour, value: -1, to: now)!),
-            ("Very recent entry", calendar.date(byAdding: .minute, value: -5, to: now)!),
+        let entries = try [
+            ("Very old entry", XCTUnwrap(calendar.date(byAdding: .hour, value: -5, to: now))),
+            ("Old entry", XCTUnwrap(calendar.date(byAdding: .hour, value: -4, to: now))),
+            ("Medium old entry", XCTUnwrap(calendar.date(byAdding: .hour, value: -3, to: now))),
+            ("Recent entry", XCTUnwrap(calendar.date(byAdding: .hour, value: -1, to: now))),
+            ("Very recent entry", XCTUnwrap(calendar.date(byAdding: .minute, value: -5, to: now))),
         ]
 
         for (content, timestamp) in entries {
@@ -367,7 +371,7 @@ final class APITests: XCTestCase {
                 id: nil,
                 content: content,
                 type: "public.utf8-plain-text",
-                timestamp: timestamp
+                timestamp: timestamp,
             )
             _ = try dbManager.saveEntry(entry)
         }
@@ -376,8 +380,8 @@ final class APITests: XCTestCase {
 
         // Format dates for API request
         let formatter = ISO8601DateFormatter()
-        let fiveHoursAgo = calendar.date(byAdding: .hour, value: -5, to: now)!
-        let twoHoursAgo = calendar.date(byAdding: .hour, value: -2, to: now)!
+        let fiveHoursAgo = try XCTUnwrap(calendar.date(byAdding: .hour, value: -5, to: now))
+        let twoHoursAgo = try XCTUnwrap(calendar.date(byAdding: .hour, value: -2, to: now))
 
         // Test delete with date range (start and end dates)
         let startDateStr = formatter.string(from: fiveHoursAgo)
@@ -408,12 +412,12 @@ final class APITests: XCTestCase {
         let calendar = Calendar.current
 
         // Add entries with different timestamps
-        let entries = [
-            ("Very old entry", calendar.date(byAdding: .hour, value: -5, to: now)!),
-            ("Old entry", calendar.date(byAdding: .hour, value: -4, to: now)!),
-            ("Medium old entry", calendar.date(byAdding: .hour, value: -3, to: now)!),
-            ("Recent entry", calendar.date(byAdding: .hour, value: -1, to: now)!),
-            ("Very recent entry", calendar.date(byAdding: .minute, value: -5, to: now)!),
+        let entries = try [
+            ("Very old entry", XCTUnwrap(calendar.date(byAdding: .hour, value: -5, to: now))),
+            ("Old entry", XCTUnwrap(calendar.date(byAdding: .hour, value: -4, to: now))),
+            ("Medium old entry", XCTUnwrap(calendar.date(byAdding: .hour, value: -3, to: now))),
+            ("Recent entry", XCTUnwrap(calendar.date(byAdding: .hour, value: -1, to: now))),
+            ("Very recent entry", XCTUnwrap(calendar.date(byAdding: .minute, value: -5, to: now))),
         ]
 
         for (content, timestamp) in entries {
@@ -421,7 +425,7 @@ final class APITests: XCTestCase {
                 id: nil,
                 content: content,
                 type: "public.utf8-plain-text",
-                timestamp: timestamp
+                timestamp: timestamp,
             )
             _ = try dbManager.saveEntry(entry)
         }
@@ -455,12 +459,12 @@ final class APITests: XCTestCase {
         let calendar = Calendar.current
 
         // Add entries with different timestamps
-        let entries = [
-            ("Very old entry", calendar.date(byAdding: .hour, value: -5, to: now)!),
-            ("Old entry", calendar.date(byAdding: .hour, value: -4, to: now)!),
-            ("Medium old entry", calendar.date(byAdding: .hour, value: -3, to: now)!),
-            ("Recent entry", calendar.date(byAdding: .hour, value: -1, to: now)!),
-            ("Very recent entry", calendar.date(byAdding: .minute, value: -5, to: now)!),
+        let entries = try [
+            ("Very old entry", XCTUnwrap(calendar.date(byAdding: .hour, value: -5, to: now))),
+            ("Old entry", XCTUnwrap(calendar.date(byAdding: .hour, value: -4, to: now))),
+            ("Medium old entry", XCTUnwrap(calendar.date(byAdding: .hour, value: -3, to: now))),
+            ("Recent entry", XCTUnwrap(calendar.date(byAdding: .hour, value: -1, to: now))),
+            ("Very recent entry", XCTUnwrap(calendar.date(byAdding: .minute, value: -5, to: now))),
         ]
 
         for (content, timestamp) in entries {
@@ -468,7 +472,7 @@ final class APITests: XCTestCase {
                 id: nil,
                 content: content,
                 type: "public.utf8-plain-text",
-                timestamp: timestamp
+                timestamp: timestamp,
             )
             _ = try dbManager.saveEntry(entry)
         }
@@ -477,7 +481,7 @@ final class APITests: XCTestCase {
 
         // Format date for API request
         let formatter = ISO8601DateFormatter()
-        let threeHoursAgo = calendar.date(byAdding: .hour, value: -3, to: now)!
+        let threeHoursAgo = try XCTUnwrap(calendar.date(byAdding: .hour, value: -3, to: now))
         let startDateStr = formatter.string(from: threeHoursAgo)
 
         // Test delete with start date only (should delete entries from 3 hours ago until now)
@@ -506,12 +510,12 @@ final class APITests: XCTestCase {
         let calendar = Calendar.current
 
         // Add entries with different timestamps
-        let entries = [
-            ("Very old entry", calendar.date(byAdding: .hour, value: -5, to: now)!),
-            ("Old entry", calendar.date(byAdding: .hour, value: -4, to: now)!),
-            ("Medium old entry", calendar.date(byAdding: .hour, value: -3, to: now)!),
-            ("Recent entry", calendar.date(byAdding: .hour, value: -1, to: now)!),
-            ("Very recent entry", calendar.date(byAdding: .minute, value: -5, to: now)!),
+        let entries = try [
+            ("Very old entry", XCTUnwrap(calendar.date(byAdding: .hour, value: -5, to: now))),
+            ("Old entry", XCTUnwrap(calendar.date(byAdding: .hour, value: -4, to: now))),
+            ("Medium old entry", XCTUnwrap(calendar.date(byAdding: .hour, value: -3, to: now))),
+            ("Recent entry", XCTUnwrap(calendar.date(byAdding: .hour, value: -1, to: now))),
+            ("Very recent entry", XCTUnwrap(calendar.date(byAdding: .minute, value: -5, to: now))),
         ]
 
         for (content, timestamp) in entries {
@@ -519,7 +523,7 @@ final class APITests: XCTestCase {
                 id: nil,
                 content: content,
                 type: "public.utf8-plain-text",
-                timestamp: timestamp
+                timestamp: timestamp,
             )
             _ = try dbManager.saveEntry(entry)
         }
@@ -528,8 +532,8 @@ final class APITests: XCTestCase {
 
         // Format dates for API request
         let formatter = ISO8601DateFormatter()
-        let fiveHoursAgo = calendar.date(byAdding: .hour, value: -5, to: now)!
-        let oneHourAgo = calendar.date(byAdding: .hour, value: -1, to: now)!
+        let fiveHoursAgo = try XCTUnwrap(calendar.date(byAdding: .hour, value: -5, to: now))
+        let oneHourAgo = try XCTUnwrap(calendar.date(byAdding: .hour, value: -1, to: now))
 
         let startDateStr = formatter.string(from: fiveHoursAgo)
         let endDateStr = formatter.string(from: oneHourAgo)
@@ -565,7 +569,7 @@ final class APITests: XCTestCase {
                 id: nil,
                 content: content,
                 type: "public.utf8-plain-text",
-                timestamp: Date()
+                timestamp: Date(),
             )
             _ = try dbManager.saveEntry(entry)
         }

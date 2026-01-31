@@ -104,7 +104,7 @@ struct ClipboardEntry: Codable, FetchableRecord, PersistableRecord {
         self.timestamp = timestamp
     }
 
-    // Override database encoding to ensure proper UUID format
+    /// Override database encoding to ensure proper UUID format
     func encode(to container: inout PersistenceContainer) throws {
         container["id"] = id?.uuidString
         container["content"] = content
@@ -112,7 +112,7 @@ struct ClipboardEntry: Codable, FetchableRecord, PersistableRecord {
         container["timestamp"] = timestamp
     }
 
-    // Override database decoding to handle UUID format
+    /// Override database decoding to handle UUID format
     init(row: Row) throws {
         if let uuidString = row["id"] as String? {
             id = UUID(uuidString: uuidString)
@@ -140,7 +140,7 @@ class DatabaseManager: @unchecked Sendable {
         // Ensure directory exists
         try FileManager.default.createDirectory(
             atPath: (path as NSString).deletingLastPathComponent,
-            withIntermediateDirectories: true
+            withIntermediateDirectories: true,
         )
 
         dbQueue = try DatabaseQueue(path: path)
@@ -167,7 +167,7 @@ class DatabaseManager: @unchecked Sendable {
                     FROM clipboard_entries
                     GROUP BY content
                 )
-                """
+                """,
             )
         }
 
@@ -199,7 +199,7 @@ class DatabaseManager: @unchecked Sendable {
             // Ensure backup directory exists
             try FileManager.default.createDirectory(
                 atPath: backupDir,
-                withIntermediateDirectories: true
+                withIntermediateDirectories: true,
             )
 
             // Create a timestamp for the backup file
@@ -256,7 +256,7 @@ class DatabaseManager: @unchecked Sendable {
             let existingCount =
                 try Int.fetchOne(
                     database, sql: "SELECT COUNT(*) FROM clipboard_entries WHERE content = ?",
-                    arguments: [entry.content]
+                    arguments: [entry.content],
                 ) ?? 0
 
             if existingCount == 0 {
@@ -279,7 +279,7 @@ class DatabaseManager: @unchecked Sendable {
                             LIMIT ?
                         )
                         """,
-                        arguments: [maxEntries]
+                        arguments: [maxEntries],
                     )
                 }
 
@@ -292,7 +292,7 @@ class DatabaseManager: @unchecked Sendable {
                     SET timestamp = ?
                     WHERE content = ?
                     """,
-                    arguments: [entry.timestamp, entry.content]
+                    arguments: [entry.timestamp, entry.content],
                 )
 
                 return false
@@ -304,7 +304,7 @@ class DatabaseManager: @unchecked Sendable {
         type: String? = nil,
         query: String? = nil,
         startDate: Date? = nil, endDate: Date? = nil,
-        limit: Int? = nil, offset: Int? = nil
+        limit: Int? = nil, offset: Int? = nil,
     ) throws -> [ClipboardEntry] {
         try dbQueue.read { database in
             var sql = "SELECT * FROM clipboard_entries"
@@ -379,9 +379,9 @@ class DatabaseManager: @unchecked Sendable {
         startDate: Date? = nil,
         endDate: Date? = nil,
         range: String? = nil,
-        limit: Int? = nil
+        limit: Int? = nil,
     ) throws -> (
-        deletedCount: Int, remainingCount: Int
+        deletedCount: Int, remainingCount: Int,
     ) {
         try dbQueue.write { database in
             let totalCount = try Int.fetchOne(database, sql: "SELECT COUNT(*) FROM clipboard_entries") ?? 0
@@ -530,10 +530,10 @@ class ConfigManager {
     private let configFile: URL
     private(set) var config: KopyaConfig
 
-    // Cache for compiled regex patterns
+    /// Cache for compiled regex patterns
     private var compiledFilterPatterns: [Regex<Substring>]
 
-    // Create a static logger for the ConfigManager class
+    /// Create a static logger for the ConfigManager class
     private static let logger = Logger(label: "com.jesse-c.kopya.config")
 
     init(configFile: URL? = nil) throws {
@@ -556,7 +556,7 @@ class ConfigManager {
                     return try Regex(pattern)
                 } catch {
                     Self.logger.error(
-                        "Failed to parse filter pattern '\(pattern)' to Regex: \(error.localizedDescription)"
+                        "Failed to parse filter pattern '\(pattern)' to Regex: \(error.localizedDescription)",
                     )
                     return nil
                 }
@@ -574,7 +574,7 @@ class ConfigManager {
                 logger.error("Config file not found at \(fileURL.path)")
                 throw NSError(
                     domain: "ConfigManager", code: 1,
-                    userInfo: [NSLocalizedDescriptionKey: "Config file not found at \(fileURL.path)"]
+                    userInfo: [NSLocalizedDescriptionKey: "Config file not found at \(fileURL.path)"],
                 )
             }
 
@@ -594,7 +594,7 @@ class ConfigManager {
                 Self.logger.error("Missing 'run-at-login' in config")
                 throw NSError(
                     domain: "ConfigManager", code: 3,
-                    userInfo: [NSLocalizedDescriptionKey: "Missing 'run-at-login' in config"]
+                    userInfo: [NSLocalizedDescriptionKey: "Missing 'run-at-login' in config"],
                 )
             }
 
@@ -605,7 +605,7 @@ class ConfigManager {
                 Self.logger.error("Missing 'max-entries' in config")
                 throw NSError(
                     domain: "ConfigManager", code: 4,
-                    userInfo: [NSLocalizedDescriptionKey: "Missing 'max-entries' in config"]
+                    userInfo: [NSLocalizedDescriptionKey: "Missing 'max-entries' in config"],
                 )
             }
 
@@ -616,7 +616,7 @@ class ConfigManager {
                 Self.logger.error("Missing 'port' in config")
                 throw NSError(
                     domain: "ConfigManager", code: 5,
-                    userInfo: [NSLocalizedDescriptionKey: "Missing 'port' in config"]
+                    userInfo: [NSLocalizedDescriptionKey: "Missing 'port' in config"],
                 )
             }
 
@@ -649,7 +649,7 @@ class ConfigManager {
                 Self.logger.error("Missing 'backup' in config")
                 throw NSError(
                     domain: "ConfigManager", code: 6,
-                    userInfo: [NSLocalizedDescriptionKey: "Missing 'backup' in config"]
+                    userInfo: [NSLocalizedDescriptionKey: "Missing 'backup' in config"],
                 )
             }
 
@@ -673,19 +673,17 @@ class ConfigManager {
 
             // Decode the table to our KopyaConfig struct
             let decoder = TOMLDecoder()
-            let config = try decoder.decode(KopyaConfig.self, from: configTable)
-
-            return config
+            return try decoder.decode(KopyaConfig.self, from: configTable)
 
         } catch let error as TOMLParseError {
             Self.logger.error(
-                "TOML Parse Error: Line \(error.source.begin.line), Column \(error.source.begin.column)"
+                "TOML Parse Error: Line \(error.source.begin.line), Column \(error.source.begin.column)",
             )
             throw NSError(
                 domain: "ConfigManager", code: 2,
                 userInfo: [
                     NSLocalizedDescriptionKey: "Failed to parse config: \(error.localizedDescription)",
-                ]
+                ],
             )
         } catch {
             Self.logger.error("Error loading config: \(error.localizedDescription)")
@@ -693,12 +691,12 @@ class ConfigManager {
         }
     }
 
-    // Parse string patterns into Swift Regex objects directly
+    /// Parse string patterns into Swift Regex objects directly
     func getFilterRegexPatterns() -> [Regex<Substring>] {
         compiledFilterPatterns
     }
 
-    // Check if content should be filtered based on filter patterns
+    /// Check if content should be filtered based on filter patterns
     func shouldFilter(_ content: String) -> Bool {
         // No patterns means no filtering
         guard !compiledFilterPatterns.isEmpty else {
@@ -807,7 +805,7 @@ func setupRoutes(_ app: Application, _ dbManager: DatabaseManager, _: ConfigMana
             limit: limit,
             offset: offset,
             startDate: startDate,
-            endDate: endDate
+            endDate: endDate,
         )
 
         // Get total count separately to ensure accurate count even with limit (and offset)
@@ -852,7 +850,7 @@ func setupRoutes(_ app: Application, _ dbManager: DatabaseManager, _: ConfigMana
             query: query,
             startDate: startDate,
             endDate: endDate,
-            limit: limit
+            limit: limit,
         )
         return HistoryResponse(entries: entries.map(ClipboardEntryResponse.init), total: entries.count)
     }
@@ -866,7 +864,7 @@ func setupRoutes(_ app: Application, _ dbManager: DatabaseManager, _: ConfigMana
         let formatter = ISO8601DateFormatter()
         let (deletedCount, remainingCount) = try dbManager.deleteEntries(
             startDate: startDate.flatMap { formatter.date(from: $0) },
-            endDate: endDate.flatMap { formatter.date(from: $0) }, range: range, limit: limit
+            endDate: endDate.flatMap { formatter.date(from: $0) }, range: range, limit: limit,
         )
         let response = Response(status: .ok)
         try response.content.encode([
@@ -890,7 +888,7 @@ func setupRoutes(_ app: Application, _ dbManager: DatabaseManager, _: ConfigMana
         let responseData = DeleteByIdResponse(
             success: success,
             id: idString,
-            message: success ? "Entry deleted successfully" : "Entry not found"
+            message: success ? "Entry deleted successfully" : "Entry not found",
         )
 
         try response.content.encode(responseData)
@@ -911,7 +909,7 @@ func setupRoutes(_ app: Application, _ dbManager: DatabaseManager, _: ConfigMana
 
         return PrivateModeResponse(
             success: true,
-            message: "Private mode enabled" + (range != nil ? " for \(range!)" : "")
+            message: "Private mode enabled" + (range != nil ? " for \(range!)" : ""),
         )
     }
 
@@ -925,7 +923,7 @@ func setupRoutes(_ app: Application, _ dbManager: DatabaseManager, _: ConfigMana
 
         return PrivateModeResponse(
             success: true,
-            message: "Private mode disabled"
+            message: "Private mode disabled",
         )
     }
 
@@ -955,18 +953,16 @@ func setupRoutes(_ app: Application, _ dbManager: DatabaseManager, _: ConfigMana
             }
         }
 
-        let response = PrivateModeStatusResponse(
+        return PrivateModeStatusResponse(
             privateMode: !monitor.isMonitoring,
             timerActive: timerActive,
             scheduledDisableTime: scheduledDisableTime?.formatted(),
-            remainingTime: remainingTimeString
+            remainingTime: remainingTimeString,
         )
-
-        return response
     }
 }
 
-// Storage key for the clipboard monitor
+/// Storage key for the clipboard monitor
 struct ClipboardMonitorKey: StorageKey {
     typealias Value = ClipboardMonitor
 }
@@ -983,7 +979,7 @@ class ClipboardMonitor: @unchecked Sendable {
     private(set) var scheduledDisableTime: Date?
     private var privateModeCancellable: DispatchWorkItem?
 
-    // Types in order of priority
+    /// Types in order of priority
     private let monitoredTypes: [(NSPasteboard.PasteboardType, String)] = [
         (.URL, "public.url"),
         (.fileURL, "public.file-url"),
@@ -1023,7 +1019,7 @@ class ClipboardMonitor: @unchecked Sendable {
             scheduledDisableTime = Date().addingTimeInterval(timeInterval)
 
             logger.notice(
-                "Private mode will automatically disable after \(rangeStr) at \(scheduledDisableTime!.formatted())"
+                "Private mode will automatically disable after \(rangeStr) at \(scheduledDisableTime!.formatted())",
             )
 
             // Create a cancellable work item for disabling private mode
@@ -1097,7 +1093,7 @@ class ClipboardMonitor: @unchecked Sendable {
                             id: nil,
                             content: clipboardString,
                             type: type.rawValue,
-                            timestamp: Date()
+                            timestamp: Date(),
                         )
 
                         do {
@@ -1176,17 +1172,17 @@ class ClipboardMonitor: @unchecked Sendable {
 struct Kopya: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
         abstract: "A clipboard manager for macOS",
-        version: Version.version
+        version: Version.version,
     )
 
     @ArgumentParser.Option(
-        name: [.customShort("p"), .long], help: "Port to run the server on (overrides config value)"
+        name: [.customShort("p"), .long], help: "Port to run the server on (overrides config value)",
     )
     var port: Int?
 
     @ArgumentParser.Option(
         name: [.customShort("m"), .long],
-        help: "Maximum number of clipboard entries to store (overrides config value)"
+        help: "Maximum number of clipboard entries to store (overrides config value)",
     )
     var maxEntries: Int?
 
@@ -1233,13 +1229,13 @@ struct Kopya: AsyncParsableCommand {
         // Create database manager
         let dbManager = try DatabaseManager(
             maxEntries: maxEntries,
-            backupConfig: configManager.config.backup
+            backupConfig: configManager.config.backup,
         )
 
         // Create clipboard monitor
         let clipboardMonitor = try ClipboardMonitor(
             maxEntries: maxEntries,
-            backupConfig: configManager.config.backup
+            backupConfig: configManager.config.backup,
         )
 
         // Configure and start Vapor server
@@ -1267,7 +1263,7 @@ struct Kopya: AsyncParsableCommand {
         clipboardMonitor.startMonitoring(configManager: configManager)
     }
 
-    // Function to sync run-at-login setting with config
+    /// Function to sync run-at-login setting with config
     private func syncRunAtLoginWithConfig(_ enabled: Bool) throws {
         // Check current status
         let currentStatus = SMAppService.mainApp.status

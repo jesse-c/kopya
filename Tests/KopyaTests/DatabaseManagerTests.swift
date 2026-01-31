@@ -26,7 +26,7 @@ final class DatabaseManagerTests: XCTestCase {
             id: nil,
             content: "Test content",
             type: "public.utf8-plain-text",
-            timestamp: Date()
+            timestamp: Date(),
         )
 
         // Save entry
@@ -47,7 +47,7 @@ final class DatabaseManagerTests: XCTestCase {
                 id: nil,
                 content: "Content \(index)",
                 type: "public.utf8-plain-text",
-                timestamp: Date()
+                timestamp: Date(),
             )
             _ = try dbManager.saveEntry(entry)
         }
@@ -77,7 +77,7 @@ final class DatabaseManagerTests: XCTestCase {
                 id: nil,
                 content: content,
                 type: type,
-                timestamp: Date()
+                timestamp: Date(),
             )
             _ = try dbManager.saveEntry(entry)
         }
@@ -98,10 +98,10 @@ final class DatabaseManagerTests: XCTestCase {
         let calendar = Calendar.current
 
         // Add entries with different timestamps
-        let entries = [
-            ("Old entry", calendar.date(byAdding: .hour, value: -2, to: now)!),
-            ("Recent entry", calendar.date(byAdding: .minute, value: -30, to: now)!),
-            ("Very recent entry", calendar.date(byAdding: .minute, value: -5, to: now)!),
+        let entries = try [
+            ("Old entry", XCTUnwrap(calendar.date(byAdding: .hour, value: -2, to: now))),
+            ("Recent entry", XCTUnwrap(calendar.date(byAdding: .minute, value: -30, to: now))),
+            ("Very recent entry", XCTUnwrap(calendar.date(byAdding: .minute, value: -5, to: now))),
         ]
 
         for (content, timestamp) in entries {
@@ -109,15 +109,15 @@ final class DatabaseManagerTests: XCTestCase {
                 id: nil,
                 content: content,
                 type: "public.utf8-plain-text",
-                timestamp: timestamp
+                timestamp: timestamp,
             )
             _ = try dbManager.saveEntry(entry)
         }
 
         // Test last hour filtering
         let lastHourEntries = try dbManager.searchEntries(
-            startDate: calendar.date(byAdding: .hour, value: -1, to: now)!,
-            endDate: now
+            startDate: XCTUnwrap(calendar.date(byAdding: .hour, value: -1, to: now)),
+            endDate: now,
         )
         XCTAssertEqual(lastHourEntries.count, 2)
         XCTAssertTrue(lastHourEntries.contains { $0.content == "Recent entry" })
@@ -129,12 +129,12 @@ final class DatabaseManagerTests: XCTestCase {
         let calendar = Calendar.current
 
         // Add entries with different timestamps
-        let entries = [
-            ("Very old entry", calendar.date(byAdding: .hour, value: -5, to: now)!),
-            ("Old entry", calendar.date(byAdding: .hour, value: -4, to: now)!),
-            ("Medium old entry", calendar.date(byAdding: .hour, value: -3, to: now)!),
-            ("Recent entry", calendar.date(byAdding: .minute, value: -30, to: now)!),
-            ("Very recent entry", calendar.date(byAdding: .minute, value: -5, to: now)!),
+        let entries = try [
+            ("Very old entry", XCTUnwrap(calendar.date(byAdding: .hour, value: -5, to: now))),
+            ("Old entry", XCTUnwrap(calendar.date(byAdding: .hour, value: -4, to: now))),
+            ("Medium old entry", XCTUnwrap(calendar.date(byAdding: .hour, value: -3, to: now))),
+            ("Recent entry", XCTUnwrap(calendar.date(byAdding: .minute, value: -30, to: now))),
+            ("Very recent entry", XCTUnwrap(calendar.date(byAdding: .minute, value: -5, to: now))),
         ]
 
         for (content, timestamp) in entries {
@@ -142,14 +142,14 @@ final class DatabaseManagerTests: XCTestCase {
                 id: nil,
                 content: content,
                 type: "public.utf8-plain-text",
-                timestamp: timestamp
+                timestamp: timestamp,
             )
             _ = try dbManager.saveEntry(entry)
         }
 
         // Delete entries between 5 hours ago and 2 hours ago
-        let fiveHoursAgo = calendar.date(byAdding: .hour, value: -5, to: now)!
-        let twoHoursAgo = calendar.date(byAdding: .hour, value: -2, to: now)!
+        let fiveHoursAgo = try XCTUnwrap(calendar.date(byAdding: .hour, value: -5, to: now))
+        let twoHoursAgo = try XCTUnwrap(calendar.date(byAdding: .hour, value: -2, to: now))
         let result = try dbManager.deleteEntries(startDate: fiveHoursAgo, endDate: twoHoursAgo)
 
         // Verify deletion count
@@ -169,12 +169,12 @@ final class DatabaseManagerTests: XCTestCase {
         let calendar = Calendar.current
 
         // Add entries with different timestamps
-        let entries = [
-            ("Very old entry", calendar.date(byAdding: .hour, value: -5, to: now)!),
-            ("Old entry", calendar.date(byAdding: .hour, value: -4, to: now)!),
-            ("Medium old entry", calendar.date(byAdding: .hour, value: -3, to: now)!),
-            ("Recent entry", calendar.date(byAdding: .minute, value: -30, to: now)!),
-            ("Very recent entry", calendar.date(byAdding: .minute, value: -5, to: now)!),
+        let entries = try [
+            ("Very old entry", XCTUnwrap(calendar.date(byAdding: .hour, value: -5, to: now))),
+            ("Old entry", XCTUnwrap(calendar.date(byAdding: .hour, value: -4, to: now))),
+            ("Medium old entry", XCTUnwrap(calendar.date(byAdding: .hour, value: -3, to: now))),
+            ("Recent entry", XCTUnwrap(calendar.date(byAdding: .minute, value: -30, to: now))),
+            ("Very recent entry", XCTUnwrap(calendar.date(byAdding: .minute, value: -5, to: now))),
         ]
 
         for (content, timestamp) in entries {
@@ -182,13 +182,13 @@ final class DatabaseManagerTests: XCTestCase {
                 id: nil,
                 content: content,
                 type: "public.utf8-plain-text",
-                timestamp: timestamp
+                timestamp: timestamp,
             )
             _ = try dbManager.saveEntry(entry)
         }
 
         // Delete entries newer than 1 hour ago
-        let oneHourAgo = calendar.date(byAdding: .hour, value: -1, to: now)!
+        let oneHourAgo = try XCTUnwrap(calendar.date(byAdding: .hour, value: -1, to: now))
         let result = try dbManager.deleteEntries(startDate: oneHourAgo)
 
         // Verify deletion count
@@ -209,13 +209,13 @@ final class DatabaseManagerTests: XCTestCase {
         let calendar = Calendar.current
 
         // Add entries with different timestamps
-        let entries = [
-            ("Very old entry", calendar.date(byAdding: .hour, value: -5, to: now)!),
-            ("Old entry", calendar.date(byAdding: .hour, value: -4, to: now)!),
-            ("Medium old entry", calendar.date(byAdding: .hour, value: -3, to: now)!),
-            ("Medium entry", calendar.date(byAdding: .hour, value: -2, to: now)!),
-            ("Recent entry", calendar.date(byAdding: .minute, value: -30, to: now)!),
-            ("Very recent entry", calendar.date(byAdding: .minute, value: -5, to: now)!),
+        let entries = try [
+            ("Very old entry", XCTUnwrap(calendar.date(byAdding: .hour, value: -5, to: now))),
+            ("Old entry", XCTUnwrap(calendar.date(byAdding: .hour, value: -4, to: now))),
+            ("Medium old entry", XCTUnwrap(calendar.date(byAdding: .hour, value: -3, to: now))),
+            ("Medium entry", XCTUnwrap(calendar.date(byAdding: .hour, value: -2, to: now))),
+            ("Recent entry", XCTUnwrap(calendar.date(byAdding: .minute, value: -30, to: now))),
+            ("Very recent entry", XCTUnwrap(calendar.date(byAdding: .minute, value: -5, to: now))),
         ]
 
         for (content, timestamp) in entries {
@@ -223,14 +223,14 @@ final class DatabaseManagerTests: XCTestCase {
                 id: nil,
                 content: content,
                 type: "public.utf8-plain-text",
-                timestamp: timestamp
+                timestamp: timestamp,
             )
             _ = try dbManager.saveEntry(entry)
         }
 
         // First, verify how many entries are in the date range
-        let fiveHoursAgo = calendar.date(byAdding: .hour, value: -5, to: now)!
-        let twoHoursAgo = calendar.date(byAdding: .hour, value: -2, to: now)!
+        let fiveHoursAgo = try XCTUnwrap(calendar.date(byAdding: .hour, value: -5, to: now))
+        let twoHoursAgo = try XCTUnwrap(calendar.date(byAdding: .hour, value: -2, to: now))
         let entriesInRange = try dbManager.searchEntries(startDate: fiveHoursAgo, endDate: twoHoursAgo)
 
         // Due to how the database handles timestamp comparison, we have 3 entries in the range
@@ -261,12 +261,12 @@ final class DatabaseManagerTests: XCTestCase {
         let calendar = Calendar.current
 
         // Add entries with different timestamps
-        let entries = [
-            ("Very old entry", calendar.date(byAdding: .hour, value: -5, to: now)!),
-            ("Old entry", calendar.date(byAdding: .hour, value: -4, to: now)!),
-            ("Medium old entry", calendar.date(byAdding: .hour, value: -3, to: now)!),
-            ("Recent entry", calendar.date(byAdding: .hour, value: -1, to: now)!),
-            ("Very recent entry", calendar.date(byAdding: .minute, value: -5, to: now)!),
+        let entries = try [
+            ("Very old entry", XCTUnwrap(calendar.date(byAdding: .hour, value: -5, to: now))),
+            ("Old entry", XCTUnwrap(calendar.date(byAdding: .hour, value: -4, to: now))),
+            ("Medium old entry", XCTUnwrap(calendar.date(byAdding: .hour, value: -3, to: now))),
+            ("Recent entry", XCTUnwrap(calendar.date(byAdding: .hour, value: -1, to: now))),
+            ("Very recent entry", XCTUnwrap(calendar.date(byAdding: .minute, value: -5, to: now))),
         ]
 
         for (content, timestamp) in entries {
@@ -274,7 +274,7 @@ final class DatabaseManagerTests: XCTestCase {
                 id: nil,
                 content: content,
                 type: "public.utf8-plain-text",
-                timestamp: timestamp
+                timestamp: timestamp,
             )
             _ = try dbManager.saveEntry(entry)
         }
@@ -306,21 +306,21 @@ final class DatabaseManagerTests: XCTestCase {
             id: nil,
             content: "Unique Entry 1 for deletion test",
             type: "public.utf8-plain-text",
-            timestamp: Date()
+            timestamp: Date(),
         )
 
         let entry2 = ClipboardEntry(
             id: nil,
             content: "Unique Entry 2 for deletion test",
             type: "public.url",
-            timestamp: Date()
+            timestamp: Date(),
         )
 
         let entry3 = ClipboardEntry(
             id: nil,
             content: "Unique Entry 3 for deletion test",
             type: "public.utf8-plain-text",
-            timestamp: Date()
+            timestamp: Date(),
         )
 
         // Save entries and get their IDs
@@ -559,7 +559,7 @@ final class DatabaseManagerTests: XCTestCase {
             try "backup content \(index)".write(to: filePath, atomically: true, encoding: .utf8)
 
             // Set creation date
-            let fileDate = calendar.date(byAdding: .minute, value: -index, to: baseDate)!
+            let fileDate = try XCTUnwrap(calendar.date(byAdding: .minute, value: -index, to: baseDate))
             try fileManager.setAttributes([.creationDate: fileDate], ofItemAtPath: filePath.path)
         }
 

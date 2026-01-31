@@ -2,7 +2,7 @@ import Foundation
 @testable import Kopya
 import XCTest
 
-// MockClipboardMonitor class for testing timer behavior
+/// MockClipboardMonitor class for testing timer behavior
 class MockClipboardMonitor {
     var isMonitoring: Bool = true
     var scheduledDisableTime: Date?
@@ -115,7 +115,7 @@ final class ClipboardMonitorTests: XCTestCase {
         XCTAssertNotNil(monitor.scheduledDisableTime, "Timer should be active when a range is specified")
     }
 
-    func testPrivateModeTimerExpiration() throws {
+    func testPrivateModeTimerExpiration() {
         // Create a mock monitor for testing timer behavior
         let monitor = MockClipboardMonitor()
 
