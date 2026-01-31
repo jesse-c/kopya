@@ -53,11 +53,11 @@ test:
 
 # Run linting
 lint:
-    swiftlint --config .swiftlint.yml
+    prek
 
 # Run formating
-format:
-    swiftformat .
+format +OPTS="":
+    swiftformat {{OPTS}} .
 
 # Clean build artifacts
 clean:

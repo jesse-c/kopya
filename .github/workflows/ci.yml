@@ -31,18 +31,16 @@ jobs:
       - name: Test
         run: just test
 
-      - name: "Lint: Swift"
-        continue-on-error: true
-        uses: cirruslabs/swiftlint-action@v1
+      - uses: taiki-e/install-action@v2
         with:
-          version: latest
-          args: "--config .swiftlint.yml"
+          tool: prek
 
-      - name: "Lint: Commits"
-        uses: cocogitto/cocogitto-action@v4
+      - uses: taiki-e/install-action@v2
         with:
-          command: check
-          args: --from-latest-tag
+          tool: cocogitto
+
+      - name: Lint
+        run: just lint
 
       - name: Format
-        run: swiftformat --lint --reporter github-actions-log .
+        run: just format --lint --reporter github-actions-log
