@@ -40,7 +40,7 @@ jobs:
 
       - name: Upload artifacts
         id: upload
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           overwrite: true
           name: version
@@ -82,7 +82,7 @@ jobs:
 
       - name: Upload artifacts
         id: upload
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: build
           overwrite: true
