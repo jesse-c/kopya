@@ -9,7 +9,7 @@ local linters = new Mapping<String, Step> {
 
     // cocogitto - conventional commit check
     ["cocogitto"] {
-        check = "cog check --from-latest-tag"
+        check = "cog check"
     }
 
     // swiftformat - code formatting
