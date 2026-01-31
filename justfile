@@ -40,16 +40,16 @@ version VERSION="":
     echo "}" >> Sources/Version.swift
 
 # Build in debug mode
-debug:
-    swift build -Xswiftc -parse-as-library --product kopya
+debug OPTS="":
+    swift build -Xswiftc -parse-as-library {{OPTS}} --product kopya
 
 # Build in release mode
-release:
-    swift build -c release -Xswiftc -parse-as-library --product kopya
+release OPTS="":
+    swift build -c release -Xswiftc -parse-as-library {{OPTS}} --product kopya
 
 # Run tests
-test:
-    swift test -v -Xswiftc -parse-as-library
+test OPTS="":
+    swift test -v -Xswiftc -parse-as-library {{OPTS}}
 
 # Run linting
 lint:

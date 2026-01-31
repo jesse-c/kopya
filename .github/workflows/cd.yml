@@ -75,7 +75,7 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build
-        run: just release
+        run: just release "-Xswiftc -Xfrontend -Xswiftc -disable-round-trip-debug-types"
 
       - name: Find binary
         run: cp ./.build/release/kopya kopya
