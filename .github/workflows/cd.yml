@@ -14,7 +14,7 @@ jobs:
       artifact-id: ${{ steps.upload.outputs.artifact-ids }}
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
@@ -57,7 +57,7 @@ jobs:
       artifact-id: ${{ steps.upload.outputs.artifact-ids }}
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Set-up Swift
         uses: swift-actions/setup-swift@v3
@@ -97,7 +97,7 @@ jobs:
     needs: build
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Set-up Just
         uses: extractions/setup-just@v3
