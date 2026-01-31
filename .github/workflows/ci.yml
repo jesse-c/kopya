@@ -26,10 +26,10 @@ jobs:
         run: just version
 
       - name: Build
-        run: just debug "-Xswiftc -Xfrontend -Xswiftc -disable-round-trip-debug-types"
+        run: just debug
 
       - name: Test
-        run: just test "-Xswiftc -Xfrontend -Xswiftc -disable-round-trip-debug-types"
+        run: just test
 
       - name: "Lint: Swift"
         continue-on-error: true
