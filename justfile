@@ -31,13 +31,15 @@ version VERSION="":
     echo "Generating version: $VERSION"
 
     # Create Swift file with version definition
-    echo "// Generated file - Do not edit manually" > Sources/Version.swift
-    echo "// Generated on $(date)" >> Sources/Version.swift
-    echo "import Foundation" >> Sources/Version.swift
-    echo "" >> Sources/Version.swift
-    echo "enum Version {" >> Sources/Version.swift
-    echo "    static let version = \"$VERSION\"" >> Sources/Version.swift
-    echo "}" >> Sources/Version.swift
+    cat > Sources/Version.swift << EOF
+// Generated file - Do not edit manually
+// Generated on $(date)
+import Foundation
+
+enum Version {
+    static let version = "$VERSION"
+}
+EOF
 
 # Build in debug mode
 debug:
