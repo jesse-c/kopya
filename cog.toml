@@ -1,6 +1,6 @@
 from_latest_tag = false
 ignore_merge_commits = false
-ignore_fixup_commits = true
+ignore_fixup_commits = false
 disable_changelog = true
 disable_bump_commit = true
 generate_mono_repository_global_tag = true
