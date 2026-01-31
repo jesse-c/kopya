@@ -31,7 +31,7 @@ let package = Package(
             path: "Sources",
             swiftSettings: [
                 .unsafeFlags(["-parse-as-library"], .when(configuration: .debug)),
-            ],
+            ]
         ),
         .testTarget(
             name: "KopyaTests",
@@ -44,7 +44,7 @@ let package = Package(
             ],
             swiftSettings: [
                 .unsafeFlags(["-parse-as-library"]),
-            ],
+            ]
         ),
-    ],
+    ]
 )
