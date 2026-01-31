@@ -1,0 +1,98 @@
+[tools]
+hk = "1.34.0"
+swift = "6.2.3"
+pkl = "0.30.2"
+swiftlint = "0.63.2"
+swiftformat = "0.59.1"
+"cargo:cocogitto" = "6.5.0"
+
+[settings]
+experimental = true
+
+[tasks.run]
+description = "Run the application (e.g. `mise run run --version`)"
+run = "./.build/debug/kopya $@"
+
+[tasks.version]
+description = "Generate version information from Git tag or commit SHA"
+run = """
+#!/usr/bin/env bash
+set -e
+if [ -n "$1" ]; then
+    VERSION="$1"
+elif git describe --tags --exact-match 2>/dev/null; then
+    VERSION=$(git describe --tags 2>/dev/null)
+else
+    COMMIT=$(git rev-parse --short HEAD 2>/dev/null)
+    if [ -n "$COMMIT" ]; then
+        VERSION="$COMMIT"
+    else
+        VERSION="unknown"
+    fi
+fi
+
+echo "Generating version: $VERSION"
+
+cat > Sources/Version.swift << EOF
+// Generated file - Do not edit manually
+// Generated on $(date)
+import Foundation
+
+enum Version {
+    static let version = "$VERSION"
+}
+EOF
+"""
+
+[tasks.debug]
+description = "Build in debug mode"
+run = "swift build -Xswiftc -parse-as-library --product kopya"
+
+[tasks.release]
+description = "Build in release mode"
+run = "swift build -c release -Xswiftc -parse-as-library --product kopya"
+
+[tasks.test]
+description = "Run tests"
+run = "swift test -v -Xswiftc -parse-as-library"
+
+[tasks.check]
+description = "Run checks on changed files"
+run = "hk check"
+
+[tasks.check-all]
+description = "Run checks on all files"
+run = "hk check --all"
+
+[tasks.fix]
+description = "Run fixes"
+run = "hk fix"
+
+[tasks.clean]
+description = "Clean build artifacts"
+run = """
+swift package clean
+rm -rf .build
+"""
+
+[tasks.setup]
+description = "Setup tools"
+run = """
+#!/usr/bin/env bash
+if ! command -v mise &>/dev/null; then
+    echo "⚠ mise is not installed"
+    echo "Please install mise from https://mise.jdx.dev/"
+    exit 1
+fi
+mise install
+"""
+
+[tasks.install]
+description = "Install the application"
+run = """
+#!/usr/bin/env bash
+LOCAL_BIN_PATH="${LOCAL_BIN_PATH:-$HOME/.local/bin}"
+mkdir -p "$LOCAL_BIN_PATH"
+cp ./.build/release/kopya "$LOCAL_BIN_PATH"/kopya
+echo "Installed Kopya to $LOCAL_BIN_PATH/kopya"
+"""
