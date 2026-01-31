@@ -68,7 +68,7 @@ jobs:
         uses: extractions/setup-just@v3
 
       - name: Download artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: version
           artifact-ids: ${{ needs.version.outputs.artifact-id }}
@@ -103,7 +103,7 @@ jobs:
         uses: extractions/setup-just@v3
 
       - name: Download artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: build
           artifact-ids: ${{ needs.version.outputs.artifact-id }}
