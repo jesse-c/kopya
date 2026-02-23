@@ -1,5 +1,5 @@
 {
-  "originHash" : "a64a06fafea4bdacd7948efb6978dc8b9ae45a688946b7468618696b09718288",
+  "originHash" : "09be275a922669ecc224e4f8ec03608a9425fc15144bb9044741377b96aacd1e",
   "pins" : [
     {
       "identity" : "async-http-client",
@@ -150,8 +150,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-log.git",
       "state" : {
-        "revision" : "2778fd4e5a12a8aaa30a3ee8285f4ce54c5f3181",
-        "version" : "1.9.1"
+        "revision" : "bbd81b6725ae874c69e9b8c8804d462356b55523",
+        "version" : "1.10.1"
       }
     },
     {
@@ -249,8 +249,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/vapor/vapor.git",
       "state" : {
-        "revision" : "6b7a70a607e61f81214f09130009af4ed76d9d62",
-        "version" : "4.119.2"
+        "revision" : "6d06e13021c299aa3300986f4eb5bb143d17ac9b",
+        "version" : "4.121.2"
       }
     },
     {
