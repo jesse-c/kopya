@@ -19,7 +19,7 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - name: Setup tools
-        uses: jdx/mise-action@v3
+        uses: jdx/mise-action@v4
         with:
           install: true
           github_token: ${{ secrets.GITHUB_TOKEN }}
